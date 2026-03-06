@@ -2,57 +2,54 @@ import React, { useMemo } from 'react';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
+import { CollaborationPlugin } from '@lexical/react/LexicalCollaborationPlugin';
 import LexicalErrorBoundary from '@lexical/react/LexicalErrorBoundary';
-import { MarkdownShortcutPlugin } from '@lexical/react/LexicalMarkdownShortcutPlugin';
-import { TRANSFORMERS } from '@lexical/markdown';
+
 import { HeadingNode, QuoteNode } from '@lexical/rich-text';
-import { ListItemNode, ListNode } from '@lexical/list';
+import { ListNode, ListItemNode } from '@lexical/list';
 import { CodeNode } from '@lexical/code';
-import { LinkNode, AutoLinkNode } from '@lexical/link';
-import * as Y from 'yjs';
-import { WebsocketProvider } from 'y-websocket';
-import { YjsPlugin } from '@lexical/yjs';
 
-const DOC_NAME = 'crousia-content';
+import { getSharedDoc, getSharedProvider } from '../utils/collaboration';
 
-function isEditable() {
-  const hostname = window.location.hostname;
-  return hostname === 'localhost' || hostname === 'admin.crousia.com';
-}
+const rawProvider = getSharedProvider();
+const provider = new Proxy(rawProvider, {
+  get(target, prop) {
+    if (prop === 'disconnect') {
+      return () => console.log('--- disconnect ignored ---');
+    }
+    return target[prop];
+  }
+});
+const doc = getSharedDoc();
 
-export default function Editor({ key }) {
-  const editable = isEditable();
-  
-  const { ydoc, provider } = useMemo(() => {
-    const y = new Y.Doc();
-    const p = new WebsocketProvider('ws://localhost:1234', DOC_NAME, y);
-    return { ydoc: y, provider: p };
+export default function Editor({ uniqueId }) {
+  const initialConfig = useMemo(() => ({
+    namespace: 'Crousia',
+    nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, CodeNode],
+    onError: (e) => console.error('Lexical Error:', e),
+  }), []);
+
+  const providerFactory = useMemo(() => {
+    return (id, yjsDocMap) => {
+      yjsDocMap.set(id, doc);
+      return provider;
+    };
   }, []);
 
-  const initialConfig = {
-    namespace: 'Crousia',
-    nodes: [
-      HeadingNode, 
-      QuoteNode, 
-      ListNode, 
-      ListItemNode, 
-      CodeNode, 
-      LinkNode, 
-      AutoLinkNode
-    ],
-    onError: (e) => console.error(e),
-    readOnly: !editable,
-  };
-
   return (
-    <LexicalComposer key={key} initialConfig={initialConfig}>
-      <YjsPlugin provider={provider} doc={ydoc} />
-      <RichTextPlugin
-        contentEditable={<ContentEditable className="editor-input" />}
-        placeholder={editable ? <div>Type...</div> : <div>View only</div>}
-        ErrorBoundary={LexicalErrorBoundary}
-      />
-      <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
+    <LexicalComposer key={uniqueId} initialConfig={initialConfig}>
+      <div className="editor-container border p-4 rounded shadow-sm">
+        <CollaborationPlugin
+          id="crousia-shared-room"
+          providerFactory={providerFactory}
+          shouldBootstrap={false}
+        />
+        <RichTextPlugin
+          contentEditable={<ContentEditable className="editor-input min-h-[200px] outline-none" />}
+          placeholder={<div className="absolute top-4 left-4 text-gray-400 pointer-events-none">Start collaborating...</div>}
+          ErrorBoundary={LexicalErrorBoundary}
+        />
+      </div>
     </LexicalComposer>
   );
 }

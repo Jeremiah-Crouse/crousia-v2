@@ -2,28 +2,22 @@ import http from 'http';
 import { WebSocketServer } from 'ws';
 import { setupWSConnection } from 'y-websocket/bin/utils';
 
-const port = 1234;
+const port = 8080;
+const server = http.createServer();
+const wss = new WebSocketServer({ noServer: true });
 
-const server = http.createServer((request, response) => {
-  response.writeHead(200, { 'Content-Type': 'text/plain' });
-  response.end('Crousia Sync Server Running');
+server.on('upgrade', (request, socket, head) => {
+  wss.handleUpgrade(request, socket, head, (ws) => {
+    wss.emit('connection', ws, request);
+  });
 });
 
-const wss = new WebSocketServer({ server });
-
 wss.on('connection', (conn, req) => {
-  const hostname = req.headers.host || '';
-  const isAdmin = hostname === 'localhost:1234' || hostname === 'admin.crousia.com:1234' || hostname === 'admin.crousia.com';
-  
-  if (!isAdmin) {
-    conn.close(4001, 'View only - editing restricted to admin.crousia.com or localhost');
-    return;
-  }
-  
+  // Add this log to confirm the connection hit the server
+  console.log('✅ Connection upgraded successfully!');
   setupWSConnection(conn, req);
 });
 
 server.listen(port, () => {
-  console.log(`🚀 Crousia Sync Server (Yjs) is live on port ${port}`);
+  console.log(`🚀 Sync Server live on port ${port}`);
 });
-

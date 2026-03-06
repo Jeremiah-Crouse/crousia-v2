@@ -9,8 +9,7 @@ export default function Home() {
       <h1>The Daily Thoughts</h1>
       <p className="date-display">{new Date().toLocaleDateString()}</p>
       <div className="thoughts-label">TODAY'S ENTRY</div>
-      <Editor key={today} />
-    </div>
+      <Editor uniqueId={location.pathname} />    </div>
   );
 }
 
