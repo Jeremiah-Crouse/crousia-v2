@@ -5,32 +5,34 @@ import { ContentEditable } from '@lexical/react/LexicalContentEditable';
 import { CollaborationPlugin } from '@lexical/react/LexicalCollaborationPlugin';
 import LexicalErrorBoundary from '@lexical/react/LexicalErrorBoundary';
 
+import { ParagraphNode, TextNode } from 'lexical';
 import { HeadingNode, QuoteNode } from '@lexical/rich-text';
 import { ListNode, ListItemNode } from '@lexical/list';
 import { CodeNode } from '@lexical/code';
+import { LinkNode } from '@lexical/link';
 
 import { getSharedDoc, getSharedProvider } from '../utils/collaboration';
-
-const rawProvider = getSharedProvider();
-const provider = new Proxy(rawProvider, {
-  get(target, prop) {
-    if (prop === 'disconnect') {
-      return () => console.log('--- disconnect ignored ---');
-    }
-    return target[prop];
-  }
-});
-const doc = getSharedDoc();
 
 export default function Editor({ uniqueId }) {
   const initialConfig = useMemo(() => ({
     namespace: 'Crousia',
-    nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, CodeNode],
+    nodes: [
+      HeadingNode,
+      QuoteNode,
+      ListNode,
+      ListItemNode,
+      CodeNode,
+      ParagraphNode,
+      TextNode,
+      LinkNode
+    ],
     onError: (e) => console.error('Lexical Error:', e),
   }), []);
 
   const providerFactory = useMemo(() => {
     return (id, yjsDocMap) => {
+      const doc = getSharedDoc();
+      const provider = getSharedProvider();
       yjsDocMap.set(id, doc);
       return provider;
     };

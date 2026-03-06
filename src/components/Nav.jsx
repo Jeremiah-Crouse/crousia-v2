@@ -1,4 +1,5 @@
 import React from 'react';
+import { clearSharedData } from '../utils/collaboration';
 
 export default function Nav({ currentView, setView }) {
   return (
@@ -10,6 +11,7 @@ export default function Nav({ currentView, setView }) {
         <a className={currentView === 'home' ? 'active' : ''} onClick={() => setView('home')}>HOME</a>
         <a className={currentView === 'log' ? 'active' : ''} onClick={() => setView('log')}>LOG</a>
         <a className={currentView === 'links' ? 'active' : ''} onClick={() => setView('links')}>LINKS</a>
+        <button onClick={clearSharedData} style={{ marginLeft: '10px', fontSize: '10px' }}>RESET</button>
       </div>
     </nav>
   );
