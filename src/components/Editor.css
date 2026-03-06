@@ -1,0 +1,35 @@
+.editor-container {
+  position: relative;
+  line-height: 1.6;
+  font-weight: 400;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.editor-input {
+  min-height: 400px;
+  resize: none;
+  font-size: 16px;
+  caret-color: #333;
+  padding: 15px;
+  outline: none;
+}
+
+.editor-placeholder {
+  color: #999;
+  overflow: hidden;
+  position: absolute;
+  text-overflow: ellipsis;
+  top: 15px;
+  left: 15px;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Markdown Rendering Styles */
+.editor-bold { font-weight: bold; }
+.editor-italic { font-style: italic; }
+.editor-h1 { font-size: 24px; font-weight: 700; margin: 10px 0; }
+.editor-ul { padding-left: 20px; list-style-type: disc; }
+
