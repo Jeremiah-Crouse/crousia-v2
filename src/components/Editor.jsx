@@ -44,7 +44,7 @@ export default function Editor({ uniqueId }) {
         <CollaborationPlugin
           id="crousia-shared-room"
           providerFactory={providerFactory}
-          shouldBootstrap={false}
+          shouldBootstrap={true}
         />
         <RichTextPlugin
           contentEditable={<ContentEditable className="editor-input min-h-[200px] outline-none" />}
