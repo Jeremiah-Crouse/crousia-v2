@@ -67,6 +67,20 @@ export const getSharedProvider = ({ readonly = false, username = "guest" } = {})
   return provider;
 };
 
+// ----- Cleanup on Unmount -----
+export const cleanupSharedState = () => {
+  if (provider) {
+    provider.destroy();
+    provider = null;
+  }
+  if (doc) {
+    doc.destroy();
+    doc = null;
+  }
+  lastSyncTime = 0;
+  console.log("🧹 Shared state cleared for fresh remount");
+};
+
 // ----- Clear shared data -----
 export const clearSharedData = async () => {
   if (doc) {

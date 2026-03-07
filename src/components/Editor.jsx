@@ -14,7 +14,7 @@ import { ListNode, ListItemNode } from "@lexical/list";
 import { CodeNode } from "@lexical/code";
 import { LinkNode } from "@lexical/link";
 import { ParagraphNode, TextNode } from "lexical";
-import { getSharedDoc, getSharedProvider, checkAndSync, isAdmin } from "../utils/collaboration";
+import { getSharedDoc, getSharedProvider, checkAndSync, isAdmin, cleanupSharedState } from "../utils/collaboration";
 
 // Auto-save logic component
 function AutoSavePlugin() {
@@ -48,10 +48,19 @@ const USERNAME = USERNAMES[Math.floor(Math.random() * USERNAMES.length)];
 
 export default function Editor() {
   const readonly = !isAdmin();
-  useEffect(() => { checkAndSync(); }, []);
+  
+  // Clean up the singletons when navigating away!
+  useEffect(() => { 
+    checkAndSync(); 
+    return () => {
+      cleanupSharedState();
+    };
+  }, []);
 
   const doc = useMemo(() => getSharedDoc(), []);
   const provider = useMemo(() => getSharedProvider({ readonly, username: USERNAME }), [readonly]);
+
+// ... rest of your Editor code remains exactly the same
 
   const providerFactory = (id, yjsDocMap) => {
     yjsDocMap.set(id, doc);
