@@ -57,29 +57,30 @@ function yjsDocToMarkdown(doc) {
 }
 
 app.post('/api/archive-today', async (req, res) => {
-  if (!dbReady) {
-    return res.status(503).json({ error: "Database not ready. Try again in a moment." });
-  }
-
   try {
-    const today = new Date().toISOString().split('T')[0];
-    const archivePath = path.join(ARCHIVES_DIR, `${today}.md`);
-    
+    console.log('--- Archive Request Triggered ---');
     const ydoc = await ldb.getYDoc('crousia-shared-room');
     
     if (!ydoc) {
-        throw new Error("Could not retrieve document from LevelDB.");
+      console.error('Archive failed: ydoc is null');
+      return res.status(500).json({ error: 'ydoc is null' });
     }
+
+    // Explicitly check for the fragment
+    const contentFragment = ydoc.getXmlText('content');
+    if (!contentFragment) {
+       console.error('Archive failed: XmlText fragment is missing');
+       return res.status(500).json({ error: 'XmlText fragment missing' });
+    }
+
+    const markdown = contentFragment.toString();
+    console.log('Archive successful, content length:', markdown.length);
     
-    const markdown = yjsDocToMarkdown(ydoc);
-    
-    fs.writeFileSync(archivePath, markdown);
-    console.log(`📦 Archived: ${today}.md - ${markdown.length} chars`);
-    
-    res.json({ success: true, date: today, chars: markdown.length });
+    res.json({ success: true, chars: markdown.length });
   } catch (e) {
-    console.error('Archive error:', e);
-    res.status(500).json({ error: e.message });
+    // THIS will tell us exactly which line fails
+    console.error('CRITICAL ARCHIVE ERROR:', e.stack); 
+    res.status(500).json({ error: e.message, stack: e.stack });
   }
 });
 
