@@ -16,40 +16,35 @@ const HOST = "0.0.0.0";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Paths
 const PROOT_ROOT = '/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root';
 const ARCHIVES_DIR = path.join(PROOT_ROOT, 'crousia-v2', 'archives');
 const LDB_PATH = path.join(PROOT_ROOT, 'crousia-v2', 'crousia-db');
-
-// Database state
-let dbReady = false;
-let ldb;
 
 // Ensure directories
 if (!fs.existsSync(ARCHIVES_DIR)) {
   fs.mkdirSync(ARCHIVES_DIR, { recursive: true });
 }
 
-// Initialize database with readiness check
-async function initDatabase() {
-  try {
-    ldb = new LeveldbPersistence(LDB_PATH);
-    // Explicitly wait for the database to open
-    await ldb.persistence.db.open();
-    dbReady = true;
-    console.log('✅ LevelDB is open and ready.');
-  } catch (err) {
-    console.error('❌ Failed to open LevelDB:', err);
-    process.exit(1); // Fail fast if DB cannot open
-  }
+// Global persistence instance
+let ldb;
+
+// Initialize Persistence
+try {
+  ldb = new LeveldbPersistence(LDB_PATH);
+  console.log('✅ LevelDB persistence initialized.');
+} catch (e) {
+  console.error('❌ Failed to initialize LevelDB:', e);
+  process.exit(1);
 }
 
 app.use(express.json());
 
 function yjsDocToMarkdown(doc) {
   try {
-    if (!doc) return '';
+    // Safely get the content fragment
     const xmlText = doc.getXmlText('content');
-    return xmlText.toString() || '';
+    return xmlText ? xmlText.toString() : '';
   } catch (e) {
     console.error('Error converting doc to markdown:', e);
     return '';
@@ -58,29 +53,26 @@ function yjsDocToMarkdown(doc) {
 
 app.post('/api/archive-today', async (req, res) => {
   try {
-    console.log('--- Archive Request Triggered ---');
+    const today = new Date().toISOString().split('T')[0];
+    const archivePath = path.join(ARCHIVES_DIR, `${today}.md`);
+    
+    // Retrieve Yjs document
     const ydoc = await ldb.getYDoc('crousia-shared-room');
     
     if (!ydoc) {
-      console.error('Archive failed: ydoc is null');
-      return res.status(500).json({ error: 'ydoc is null' });
+      throw new Error("Could not retrieve YDoc from database");
     }
-
-    // Explicitly check for the fragment
-    const contentFragment = ydoc.getXmlText('content');
-    if (!contentFragment) {
-       console.error('Archive failed: XmlText fragment is missing');
-       return res.status(500).json({ error: 'XmlText fragment missing' });
-    }
-
-    const markdown = contentFragment.toString();
-    console.log('Archive successful, content length:', markdown.length);
     
-    res.json({ success: true, chars: markdown.length });
+    const markdown = yjsDocToMarkdown(ydoc);
+    
+    // Save to file
+    fs.writeFileSync(archivePath, markdown);
+    console.log(`📦 Archived: ${today}.md - ${markdown.length} chars`);
+    
+    res.json({ success: true, date: today, chars: markdown.length });
   } catch (e) {
-    // THIS will tell us exactly which line fails
-    console.error('CRITICAL ARCHIVE ERROR:', e.stack); 
-    res.status(500).json({ error: e.message, stack: e.stack });
+    console.error('Archive error:', e);
+    res.status(500).json({ error: e.message });
   }
 });
 
@@ -103,8 +95,7 @@ app.get('/api/archive/:date', (req, res) => {
     const archivePath = path.join(ARCHIVES_DIR, `${date}.md`);
     
     if (fs.existsSync(archivePath)) {
-      const content = fs.readFileSync(archivePath, 'utf-8');
-      res.json({ date, content });
+      res.json({ date, content: fs.readFileSync(archivePath, 'utf-8') });
     } else {
       res.status(404).json({ error: 'Not found' });
     }
@@ -116,10 +107,9 @@ app.get('/api/archive/:date', (req, res) => {
 app.use('/archives', express.static(ARCHIVES_DIR));
 app.use(express.static(path.join(__dirname, "dist")));
 
+// SPA Fallback
 app.use((req, res, next) => {
-  if (req.path.startsWith('/ysl') || req.path.startsWith('/api')) {
-    return next();
-  }
+  if (req.path.startsWith('/ysl') || req.path.startsWith('/api')) return next();
   res.sendFile(path.join(__dirname, "dist/index.html"));
 });
 
@@ -139,9 +129,6 @@ wss.on("connection", (conn, req) => {
   setupWSConnection(conn, req, { docName: "crousia-shared-room" });
 });
 
-// Start the server only after the DB is initialized
-initDatabase().then(() => {
-  server.listen(PORT, HOST, () => {
-    console.log(`🚀 Server running on http://${HOST}:${PORT}`);
-  });
+server.listen(PORT, HOST, () => {
+  console.log(`🚀 Server running on http://${HOST}:${PORT}`);
 });
