@@ -6,8 +6,8 @@ import { fileURLToPath } from "url";
 import http from "http";
 import { WebSocketServer } from "ws";
 import { setupWSConnection } from "y-websocket/bin/utils";
-import { Level } from 'level';
 import { LeveldbPersistence } from "y-leveldb";
+import { ClassicLevel } from "classic-level"; // Required for readOnly configuration
 
 const app = express();
 const PORT = 5000;
@@ -16,16 +16,13 @@ const HOST = "0.0.0.0";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const PROOT_ROOT = '/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root';
-const ARCHIVES_DIR = path.join(PROOT_ROOT, 'crousia-v2', 'archives');
-const LDB_PATH = path.join(PROOT_ROOT, 'crousia-v2', 'crousia-db');
+const ARCHIVES_DIR = '/root/crousia-v2/archives';
+const LDB_PATH = '/root/crousia-v2/crousia-db';
 
 if (!fs.existsSync(ARCHIVES_DIR)) {
   fs.mkdirSync(ARCHIVES_DIR, { recursive: true });
 }
 
-// Global variables declared with 'let' to allow initialization inside startServer
-let db;
 let ldb;
 
 app.use(express.json());
@@ -98,7 +95,6 @@ app.use((req, res, next) => {
   res.sendFile(path.join(__dirname, "dist/index.html"));
 });
 
-// WebSocket Server
 const server = http.createServer(app);
 const wss = new WebSocketServer({ noServer: true });
 
@@ -117,23 +113,16 @@ wss.on("connection", (conn, req) => {
 
 async function startServer() {
   try {
-    // HARDCODED absolute path. 
-    // Do not use variables or path.join here for this test.
-    const hardcodedPath = '/root/crousia-v2/crousia-db';
-    
-    console.log('DEBUG: Attempting to open LevelDB at path:', hardcodedPath);
+    console.log('DEBUG: Opening LevelDB in READ-ONLY mode at:', LDB_PATH);
 
-    // Verify it's a string before passing
-    if (typeof hardcodedPath !== 'string' || hardcodedPath.length === 0) {
-      throw new Error('Path is not a valid string!');
-    }
-
-    ldb = new LeveldbPersistence(hardcodedPath);
+    // Explicitly create readOnly database instance
+    const db = new ClassicLevel(LDB_PATH, { readOnly: true });
+    ldb = new LeveldbPersistence(LDB_PATH, { db });
     
     // Ping to verify
     await ldb.getYDoc('init-check'); 
     
-    console.log('✅ LevelDB is confirmed open.');
+    console.log('✅ LevelDB is confirmed open in READ-ONLY mode.');
     
     server.listen(PORT, HOST, () => {
       console.log(`🚀 Server running on http://${HOST}:${PORT}`);
@@ -144,5 +133,4 @@ async function startServer() {
   }
 }
 
-// Start the sequence
 startServer();
