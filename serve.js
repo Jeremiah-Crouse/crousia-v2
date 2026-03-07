@@ -35,11 +35,20 @@ app.post('/api/archive-today', async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     const archivePath = path.join(ARCHIVES_DIR, `${today}.md`);
     
-    // Use the correct key 'root' instead of 'content'
-    const xmlText = sharedDoc.getXmlText('root');
+    // 1. Get the shared type by name. 
+    // Use the Yjs document instance to retrieve the type 'root'.
+    const sharedType = sharedDoc.get('root');
     
-    // xmlText is the object that has the .toString() method
-    const markdown = xmlText.toString();
+    // 2. Safely check if it exists and has the expected method
+    if (!sharedType) {
+      throw new Error("Shared type 'root' not found in YDoc");
+    }
+
+    // If 'root' is an XmlText or XmlFragment, it will have .toString()
+    // If it's a Y.Text, it will also have .toString()
+    const markdown = typeof sharedType.toString === 'function' 
+      ? sharedType.toString() 
+      : JSON.stringify(sharedType.toJSON());
     
     fs.writeFileSync(archivePath, markdown);
     console.log(`📦 Archived: ${today}.md - ${markdown.length} chars`);
