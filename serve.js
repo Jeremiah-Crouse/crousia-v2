@@ -16,8 +16,12 @@ const HOST = "0.0.0.0";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const ARCHIVES_DIR = path.join(__dirname, "archives");
-const ldb = new LeveldbPersistence('./crousia-db');
+// Use proot directory for LevelDB (same as y-websocket)
+const PROOT_ROOT = '/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root';
+const ARCHIVES_DIR = path.join(PROOT_ROOT, 'crousia-v2', 'archives');
+const LDB_PATH = path.join(PROOT_ROOT, 'crousia-v2', 'crousia-db');
+
+const ldb = new LeveldbPersistence(LDB_PATH);
 
 if (!fs.existsSync(ARCHIVES_DIR)) {
   fs.mkdirSync(ARCHIVES_DIR, { recursive: true });
@@ -48,14 +52,20 @@ app.post('/api/archive-today', async (req, res) => {
     const archivePath = path.join(ARCHIVES_DIR, `${today}.md`);
     
     const ydoc = await ldb.getYDoc('crousia-shared-room');
+    
+    console.log('Yjs doc keys:', Array.from(ydoc.getMap().keys()));
+    console.log('Yjs xmlFragment:', ydoc.getXmlFragment('content').toString().substring(0, 200));
+    
     const markdown = yjsDocToMarkdown(ydoc);
+    console.log('Markdown:', markdown.substring(0, 200));
     
     fs.writeFileSync(archivePath, markdown);
-    console.log(`📦 Archived: ${today}.md`);
+    console.log(`📦 Archived: ${today}.md - ${markdown.length} chars`);
     
-    clearYjsDoc();
+    // Don't clear - let the content persist for next day
+    // clearYjsDoc();
     
-    res.json({ success: true, date: today });
+    res.json({ success: true, date: today, chars: markdown.length });
   } catch (e) {
     console.error('Archive error:', e);
     res.status(500).json({ error: e.message });

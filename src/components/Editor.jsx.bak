@@ -1,0 +1,73 @@
+import React from "react";
+
+import { LexicalComposer } from "@lexical/react/LexicalComposer";
+import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
+import { ContentEditable } from "@lexical/react/LexicalContentEditable";
+import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
+import LexicalErrorBoundary from "@lexical/react/LexicalErrorBoundary";
+
+import { HeadingNode, QuoteNode } from "@lexical/rich-text";
+import { ListNode, ListItemNode } from "@lexical/list";
+import { CodeNode } from "@lexical/code";
+import { LinkNode } from "@lexical/link";
+
+import { ParagraphNode, TextNode } from "lexical";
+
+import { getSharedDoc, getSharedProvider, isAdmin } from "../utils/collaboration";
+
+export default function Editor() {
+
+  const readonly = !isAdmin();
+
+  const initialConfig = {
+    namespace: "CrousiaEditor",
+
+    editable: !readonly,
+
+    nodes: [
+      ParagraphNode,
+      TextNode,
+      HeadingNode,
+      QuoteNode,
+      ListNode,
+      ListItemNode,
+      CodeNode,
+      LinkNode
+    ],
+
+    theme: {
+      paragraph: "editor-paragraph"
+    },
+
+    onError(error) {
+      console.error(error);
+    }
+  };
+
+  // Initialize Yjs but DO NOT attach Lexical collaboration yet
+  try {
+    const doc = getSharedDoc();
+    getSharedProvider({
+      readonly,
+      username: "user_" + Math.floor(Math.random() * 1000)
+    });
+  } catch (e) {
+    console.error("YJS INIT FAILED", e);
+  }
+
+  return (
+    <LexicalComposer initialConfig={initialConfig}>
+      <div className="editor-container">
+
+        <RichTextPlugin
+          contentEditable={<ContentEditable className="editor-input" />}
+          placeholder={<div>Start writing...</div>}
+          ErrorBoundary={LexicalErrorBoundary}
+        />
+
+        <HistoryPlugin />
+
+      </div>
+    </LexicalComposer>
+  );
+}
