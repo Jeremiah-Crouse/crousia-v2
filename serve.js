@@ -16,32 +16,35 @@ const HOST = "0.0.0.0";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Paths - Ensure these are writable in your proot environment
+// Paths
 const PROOT_ROOT = '/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root';
 const ARCHIVES_DIR = path.join(PROOT_ROOT, 'crousia-v2', 'archives');
 const LDB_PATH = path.join(PROOT_ROOT, 'crousia-v2', 'crousia-db');
 
+// Ensure directories
 if (!fs.existsSync(ARCHIVES_DIR)) {
   fs.mkdirSync(ARCHIVES_DIR, { recursive: true });
 }
 
-// 1. Initialize DB Persistence
-const ldb = new LeveldbPersistence(LDB_PATH);
-let isDbReady = false;
+// Global persistence
+let ldb;
 
-// 2. Explicitly wait for DB to open to prevent LEVEL_ITERATOR_NOT_OPEN
-ldb.persistence.db.open().then(() => {
-  isDbReady = true;
-  console.log('✅ LevelDB is open and ready.');
-}).catch(err => {
-  console.error('❌ Failed to open LevelDB:', err);
-});
+async function initDatabase() {
+  try {
+    // Only initialize the instance. Do not call methods that create iterators here.
+    ldb = new LeveldbPersistence(LDB_PATH);
+    console.log('✅ LevelDB handler initialized.');
+  } catch (err) {
+    console.error('❌ Failed to initialize LevelDB:', err);
+    process.exit(1);
+  }
+}
 
 app.use(express.json());
 
 function yjsDocToMarkdown(doc) {
   try {
-    // Check if doc exists and has the expected content fragment
+    if (!doc) return '';
     const xmlText = doc.getXmlText('content');
     return xmlText ? xmlText.toString() : '';
   } catch (e) {
@@ -51,26 +54,21 @@ function yjsDocToMarkdown(doc) {
 }
 
 app.post('/api/archive-today', async (req, res) => {
-  if (!isDbReady) {
-    return res.status(503).json({ error: "Database not ready. Try again in a moment." });
-  }
+  if (!ldb) return res.status(503).json({ error: "Database not ready." });
 
   try {
     const today = new Date().toISOString().split('T')[0];
     const archivePath = path.join(ARCHIVES_DIR, `${today}.md`);
     
-    // Retrieve Yjs document safely
+    // getYDoc opens the iterator only when requested
     const ydoc = await ldb.getYDoc('crousia-shared-room');
     
-    if (!ydoc) {
-      throw new Error("Could not retrieve YDoc from database.");
-    }
+    if (!ydoc) throw new Error("Could not retrieve document from LevelDB.");
     
     const markdown = yjsDocToMarkdown(ydoc);
-    
     fs.writeFileSync(archivePath, markdown);
-    console.log(`📦 Archived: ${today}.md - ${markdown.length} chars`);
     
+    console.log(`📦 Archived: ${today}.md - ${markdown.length} chars`);
     res.json({ success: true, date: today, chars: markdown.length });
   } catch (e) {
     console.error('Archive error:', e);
@@ -95,7 +93,6 @@ app.get('/api/archive/:date', (req, res) => {
   try {
     const { date } = req.params;
     const archivePath = path.join(ARCHIVES_DIR, `${date}.md`);
-    
     if (fs.existsSync(archivePath)) {
       res.json({ date, content: fs.readFileSync(archivePath, 'utf-8') });
     } else {
@@ -109,7 +106,6 @@ app.get('/api/archive/:date', (req, res) => {
 app.use('/archives', express.static(ARCHIVES_DIR));
 app.use(express.static(path.join(__dirname, "dist")));
 
-// SPA Fallback
 app.use((req, res, next) => {
   if (req.path.startsWith('/ysl') || req.path.startsWith('/api')) return next();
   res.sendFile(path.join(__dirname, "dist/index.html"));
@@ -131,6 +127,9 @@ wss.on("connection", (conn, req) => {
   setupWSConnection(conn, req, { docName: "crousia-shared-room" });
 });
 
-server.listen(PORT, HOST, () => {
-  console.log(`🚀 Server running on http://${HOST}:${PORT}`);
+// Final initialization
+initDatabase().then(() => {
+  server.listen(PORT, HOST, () => {
+    console.log(`🚀 Server running on http://${HOST}:${PORT}`);
+  });
 });
