@@ -37,19 +37,22 @@ app.post('/api/archive-today', async (req, res) => {
     
     const sharedType = sharedDoc.get('root');
     
-    // If it's a map (very common in Yjs), get the 'content' field
-    // or stringify the JSON content directly.
-    let markdown = '';
-    
-    if (sharedType && typeof sharedType.toJSON === 'function') {
-      const data = sharedType.toJSON();
-      
-      // If the data is an object, check if there's a nested content field
-      // Or just stringify the whole thing if it's a simple structure
-      markdown = (typeof data === 'object') ? JSON.stringify(data, null, 2) : String(data);
-      
-      // OPTIONAL: If your editor uses a specific field like 'text', use that:
-      // if (data.text) markdown = data.text;
+    // --- FORCE DEBUG: What is actually in the document? ---
+    const rawData = sharedType ? sharedType.toJSON() : "NULL_TYPE";
+    console.log('DEBUG: Full document content:', JSON.stringify(rawData, null, 2));
+    // ------------------------------------------------------
+
+    if (!sharedType) {
+      throw new Error("Shared type 'root' is empty");
+    }
+
+    // Attempt to extract text from common Yjs structures
+    let markdown = "";
+    if (typeof rawData === 'string') {
+      markdown = rawData;
+    } else if (typeof rawData === 'object') {
+      // Often text is stored in a 'text' property or is an array of objects
+      markdown = JSON.stringify(rawData, null, 2); 
     }
 
     fs.writeFileSync(archivePath, markdown);
