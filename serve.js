@@ -35,12 +35,11 @@ app.post('/api/archive-today', async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     const archivePath = path.join(ARCHIVES_DIR, `${today}.md`);
     
-    // 1. Get the XmlText object by name
-    console.log('Available keys in Y.Doc:', Array.from(sharedDoc.share.keys()));
-    const xmlText = sharedDoc.getXmlText('content');
+    // Use the correct key 'root' instead of 'content'
+    const xmlText = sharedDoc.getXmlText('root');
     
-    // 2. Safely access the data
-    const markdown = xmlText ? xmlText.toString() : '';
+    // xmlText is the object that has the .toString() method
+    const markdown = xmlText.toString();
     
     fs.writeFileSync(archivePath, markdown);
     console.log(`📦 Archived: ${today}.md - ${markdown.length} chars`);
