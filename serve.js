@@ -31,22 +31,39 @@ app.use(express.json());
 
 // 3. API Routes
 app.post('/api/archive-today', async (req, res) => {
-  const rootType = sharedDoc.get('root');
-  
-  // Let's log the actual prototype of the object
-  console.log('DEBUG: Prototype of root:', Object.getPrototypeOf(rootType).constructor.name);
-  
-  // If it's a Y.Map, let's list every single key it contains
-  if (rootType.constructor.name === 'Map') {
-      console.log('DEBUG: Map keys:', Array.from(rootType.keys()));
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const archivePath = path.join(ARCHIVES_DIR, `${today}.md`);
+
+    // Helper to recursively find text in a Yjs structure
+    const extractText = (node) => {
+      if (typeof node.toString === 'function' && node.constructor.name !== 'Doc') {
+        // If it's a leaf node that holds text, return it
+        const val = node.toString();
+        if (val.length > 0) return val;
+      }
+      // If it's a container, recurse through children
+      if (node.toArray) {
+        return node.toArray().map(extractText).join('\n');
+      }
+      return '';
+    };
+
+    const rootType = sharedDoc.get('root');
+    const markdown = extractText(rootType);
+
+    if (markdown.length === 0) {
+      console.warn("⚠️ Archive attempted but no content found in YDoc root.");
+    }
+
+    fs.writeFileSync(archivePath, markdown);
+    console.log(`📦 Archived: ${today}.md - ${markdown.length} chars`);
+    
+    res.json({ success: true, date: today, chars: markdown.length });
+  } catch (e) {
+    console.error('Archive error:', e);
+    res.status(500).json({ error: e.message });
   }
-  
-  // If it's an XmlFragment, let's see its children
-  if (rootType.constructor.name === 'XmlFragment') {
-      console.log('DEBUG: XmlFragment child count:', rootType.length);
-  }
-  
-  res.json({ status: "Check console logs" });
 });
 
 app.get('/api/archives', (req, res) => {
