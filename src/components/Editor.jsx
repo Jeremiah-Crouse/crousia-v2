@@ -48,10 +48,11 @@ const USERNAME = USERNAMES[Math.floor(Math.random() * USERNAMES.length)];
 
 export default function Editor() {
   const readonly = !isAdmin();
-  
-  // Clean up the singletons when navigating away!
-  useEffect(() => { 
-    checkAndSync(); 
+
+  useEffect(() => {
+    // Component Mount: Nothing extra needed here (getSharedProvider handles initialization)
+    
+    // Component Unmount: Clean up the singleton so it forces a fresh sync on next visit
     return () => {
       cleanupSharedState();
     };
