@@ -113,17 +113,24 @@ wss.on("connection", (conn, req) => {
   setupWSConnection(conn, req, { docName: "crousia-shared-room" });
 });
 
-// 2. Explicitly open the database BEFORE starting the server
+// Remove any attempts to call .db.open()
 async function startServer() {
   try {
-    await ldb.db.open();
-    console.log('✅ LevelDB successfully opened.');
+    // 1. Just instantiate it. Let the library handle the connection.
+    ldb = new LeveldbPersistence(LDB_PATH);
     
+    // 2. Perform a "ping" operation to ensure the DB is accessible.
+    // This forces the library to trigger its internal open() logic.
+    await ldb.getYDoc('init-check'); 
+    
+    console.log('✅ LevelDB is confirmed open.');
+    
+    // 3. NOW start the HTTP server
     server.listen(PORT, HOST, () => {
       console.log(`🚀 Server running on http://${HOST}:${PORT}`);
     });
   } catch (err) {
-    console.error('❌ Failed to open LevelDB, check for LOCK files:', err);
+    console.error('❌ Failed to open LevelDB:', err);
     process.exit(1);
   }
 }
