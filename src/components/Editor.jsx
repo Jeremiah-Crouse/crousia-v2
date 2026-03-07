@@ -46,12 +46,24 @@ export default function Editor() {
   const [isSynced, setIsSynced] = useState(false);
 
   const doc = useMemo(() => getSharedDoc(), []);
+  
+  // Initialize provider and sync state
   const provider = useMemo(() => {
-    const p = getSharedProvider({ readonly, username: USERNAME });
-    // Listen for sync event to trigger re-render
-    p.on("sync", (synced) => { if (synced) setIsSynced(true); });
-    return p;
+    return getSharedProvider({ readonly, username: USERNAME });
   }, [readonly]);
+
+  useEffect(() => {
+    // Check initial state
+    setIsSynced(provider.synced);
+
+    // Set up event listeners
+    const handleSync = (synced) => setIsSynced(synced);
+    provider.on("sync", handleSync);
+    
+    return () => {
+      provider.off("sync", handleSync);
+    };
+  }, [provider]);
 
   const providerFactory = (id, yjsDocMap) => {
     yjsDocMap.set(id, doc);
@@ -68,10 +80,7 @@ export default function Editor() {
 
   return (
     <div className="editor-container">
-      {/* Don't use key={...} here. 
-         Keep the editor mounted so the WebSocket connection remains stable. 
-         Use opacity or display to hide until synced.
-      */}
+      {/* Container visibility logic */}
       <div style={{ opacity: isSynced ? 1 : 0, transition: 'opacity 0.3s' }}>
         <LexicalComposer initialConfig={initialConfig}>
           <CollaborationPlugin
@@ -90,7 +99,7 @@ export default function Editor() {
         </LexicalComposer>
       </div>
 
-      {/* Show a friendly loading indicator */}
+      {/* Loading overlay */}
       {!isSynced && (
         <div className="editor-placeholder">
           Loading content from archive...
