@@ -5,7 +5,7 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import http from "http";
 import { WebSocketServer } from "ws";
-import * as Y from "yjs"; // Import Yjs
+import * as Y from "yjs";
 import { setupWSConnection } from "y-websocket/bin/utils";
 import { LeveldbPersistence } from "y-leveldb";
 import { ClassicLevel } from "classic-level";
@@ -24,7 +24,7 @@ if (!fs.existsSync(ARCHIVES_DIR)) {
   fs.mkdirSync(ARCHIVES_DIR, { recursive: true });
 }
 
-// Memory-resident document for fast, non-iterator access
+// Memory-resident document for high-performance non-iterator access
 const sharedDoc = new Y.Doc();
 let ldb;
 
@@ -36,7 +36,7 @@ app.post('/api/archive-today', async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     const archivePath = path.join(ARCHIVES_DIR, `${today}.md`);
     
-    // Accessing directly from memory - NO iterator, NO disk I/O, NO crashes
+    // Accessing directly from memory - Bypasses iterator/disk I/O entirely
     const xmlText = sharedDoc.getXmlText('content');
     const markdown = xmlText ? xmlText.toString() : '';
     
@@ -46,7 +46,7 @@ app.post('/api/archive-today', async (req, res) => {
     res.json({ success: true, date: today, chars: markdown.length });
   } catch (e) {
     console.error('Archive error:', e);
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: "Failed to archive from memory" });
   }
 });
 
@@ -98,28 +98,27 @@ server.on('upgrade', (request, socket, head) => {
 
 wss.on("connection", (conn, req) => {
   console.log("✅ Yjs WS connected!");
-  // Sync the memory document whenever the WS connection interacts
-  setupWSConnection(conn, req, { docName: "crousia-shared-room" });
-  
-  // Note: Yjs setupWSConnection automatically syncs the provided Y.Doc 
-  // if passed in the options, or you can manage the sharedDoc object here.
+  setupWSConnection(conn, req, { docName: "crousia-shared-room", doc: sharedDoc });
 });
 
 async function startServer() {
   try {
-    console.log('DEBUG: Opening LevelDB persistence...');
+    console.log('DEBUG: Initializing and Hydrating from LevelDB...');
     const db = new ClassicLevel(LDB_PATH);
     ldb = new LeveldbPersistence(LDB_PATH, { db });
     
-    // We keep this for background persistence, 
-    // but we no longer rely on it for archive requests
-    console.log('✅ LevelDB persistence ready.');
+    // HYDRATION: Pull from disk once at startup
+    // We fetch the document once; subsequent operations use the in-memory sharedDoc
+    const persistedDoc = await ldb.getYDoc('crousia-shared-room');
+    Y.applyUpdate(sharedDoc, Y.encodeStateAsUpdate(persistedDoc));
+    
+    console.log('✅ Memory hydrated, LevelDB ready.');
     
     server.listen(PORT, HOST, () => {
       console.log(`🚀 Server running on http://${HOST}:${PORT}`);
     });
   } catch (err) {
-    console.error('❌ FATAL: Failed to open LevelDB:', err);
+    console.error('❌ FATAL: Initialization failed:', err);
     process.exit(1);
   }
 }
