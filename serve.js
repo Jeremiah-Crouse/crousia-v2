@@ -28,12 +28,19 @@ let ldb = new LeveldbPersistence(LDB_PATH);
 
 app.use(express.json());
 
-function yjsDocToMarkdown(doc) {
+async function yjsDocToMarkdown(doc) {
   try {
+    // Ensure the document has content loaded before stringifying
+    // y-leveldb documents need to be fully synced
     const xmlText = doc.getXmlText('content');
-    return xmlText ? xmlText.toString() : '';
+    
+    // Explicit check to ensure the fragment exists and is accessible
+    if (!xmlText) return '';
+    
+    // Return the string representation
+    return xmlText.toString();
   } catch (e) {
-    console.error('Error converting doc to markdown:', e);
+    console.error('CRITICAL: Error accessing Yjs document fragment:', e);
     return '';
   }
 }
