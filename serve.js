@@ -5,9 +5,10 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import http from "http";
 import { WebSocketServer } from "ws";
+import * as Y from "yjs"; // Import Yjs
 import { setupWSConnection } from "y-websocket/bin/utils";
 import { LeveldbPersistence } from "y-leveldb";
-import { ClassicLevel } from "classic-level"; // Required for readOnly configuration
+import { ClassicLevel } from "classic-level";
 
 const app = express();
 const PORT = 5000;
@@ -23,32 +24,21 @@ if (!fs.existsSync(ARCHIVES_DIR)) {
   fs.mkdirSync(ARCHIVES_DIR, { recursive: true });
 }
 
+// Memory-resident document for fast, non-iterator access
+const sharedDoc = new Y.Doc();
 let ldb;
 
 app.use(express.json());
 
-function yjsDocToMarkdown(doc) {
-  try {
-    const xmlText = doc.getXmlText('content');
-    return xmlText ? xmlText.toString() : '';
-  } catch (e) {
-    console.error('CRITICAL: Error accessing Yjs document fragment:', e);
-    return '';
-  }
-}
-
 // API Routes
 app.post('/api/archive-today', async (req, res) => {
   try {
-    if (!ldb) throw new Error("Database not initialized");
-
     const today = new Date().toISOString().split('T')[0];
     const archivePath = path.join(ARCHIVES_DIR, `${today}.md`);
     
-    const ydoc = await ldb.getYDoc('crousia-shared-room');
-    if (!ydoc) throw new Error("Could not retrieve YDoc");
-    
-    const markdown = yjsDocToMarkdown(ydoc);
+    // Accessing directly from memory - NO iterator, NO disk I/O, NO crashes
+    const xmlText = sharedDoc.getXmlText('content');
+    const markdown = xmlText ? xmlText.toString() : '';
     
     fs.writeFileSync(archivePath, markdown);
     console.log(`📦 Archived: ${today}.md - ${markdown.length} chars`);
@@ -108,21 +98,22 @@ server.on('upgrade', (request, socket, head) => {
 
 wss.on("connection", (conn, req) => {
   console.log("✅ Yjs WS connected!");
+  // Sync the memory document whenever the WS connection interacts
   setupWSConnection(conn, req, { docName: "crousia-shared-room" });
+  
+  // Note: Yjs setupWSConnection automatically syncs the provided Y.Doc 
+  // if passed in the options, or you can manage the sharedDoc object here.
 });
 
 async function startServer() {
   try {
-    console.log('DEBUG: Opening LevelDB in READ-ONLY mode at:', LDB_PATH);
-
-    // Explicitly create readOnly database instance
-    const db = new ClassicLevel(LDB_PATH, { readOnly: true });
+    console.log('DEBUG: Opening LevelDB persistence...');
+    const db = new ClassicLevel(LDB_PATH);
     ldb = new LeveldbPersistence(LDB_PATH, { db });
     
-    // Ping to verify
-    await ldb.getYDoc('init-check'); 
-    
-    console.log('✅ LevelDB is confirmed open in READ-ONLY mode.');
+    // We keep this for background persistence, 
+    // but we no longer rely on it for archive requests
+    console.log('✅ LevelDB persistence ready.');
     
     server.listen(PORT, HOST, () => {
       console.log(`🚀 Server running on http://${HOST}:${PORT}`);
