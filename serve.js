@@ -30,18 +30,25 @@ const provider = new WebsocketProvider(
 app.use(express.json());
 
 // 3. API Routes
-app.post('/api/archive-today', (req, res) => {
+app.post('/api/archive-today', async (req, res) => {
   try {
-    // Because the provider is connected, sharedDoc is always up-to-date in RAM
-    const markdown = sharedDoc.getXmlText('content')?.toString() || '';
     const today = new Date().toISOString().split('T')[0];
     const archivePath = path.join(ARCHIVES_DIR, `${today}.md`);
     
+    // 1. Get the XmlText object by name
+    console.log('Available keys in Y.Doc:', Array.from(sharedDoc.share.keys()));
+    const xmlText = sharedDoc.getXmlText('content');
+    
+    // 2. Safely access the data
+    const markdown = xmlText ? xmlText.toString() : '';
+    
     fs.writeFileSync(archivePath, markdown);
+    console.log(`📦 Archived: ${today}.md - ${markdown.length} chars`);
+    
     res.json({ success: true, date: today, chars: markdown.length });
   } catch (e) {
     console.error('Archive error:', e);
-    res.status(500).json({ success: false, error: e.message });
+    res.status(500).json({ error: e.message });
   }
 });
 
