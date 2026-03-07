@@ -46,6 +46,8 @@ function clearYjsDoc() {
   console.log('📄 Yjs doc cleared for new day');
 }
 
+app.set('trust proxy', true);
+
 app.post('/api/archive-today', async (req, res) => {
   try {
     const today = new Date().toISOString().split('T')[0];
