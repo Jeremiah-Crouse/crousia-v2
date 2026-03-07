@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import http from "http";
 import { WebSocketServer } from "ws";
 import { setupWSConnection } from "y-websocket/bin/utils";
+import { Level } from 'level';
 import { LeveldbPersistence } from "y-leveldb";
 
 const app = express();
@@ -24,7 +25,8 @@ if (!fs.existsSync(ARCHIVES_DIR)) {
 }
 
 // 1. Initialize persistence instance
-let ldb = new LeveldbPersistence(LDB_PATH);
+const db = new Level(LDB_PATH);
+let ldb = new LeveldbPersistence(db);
 
 app.use(express.json());
 
@@ -123,7 +125,8 @@ wss.on("connection", (conn, req) => {
 async function startServer() {
   try {
     // Now you can assign to ldb without a TypeError
-    ldb = new LeveldbPersistence(LDB_PATH);
+    db = new Level(LDB_PATH);
+    ldb = new LeveldbPersistence(db);
     
     // Ping to verify connectivity
     await ldb.getYDoc('init-check'); 
