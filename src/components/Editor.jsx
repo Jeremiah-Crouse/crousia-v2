@@ -1,5 +1,5 @@
 // src/components/Editor.jsx
-import React, { useMemo, useEffect, useCallback } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
@@ -14,12 +14,10 @@ import { ListNode, ListItemNode } from "@lexical/list";
 import { CodeNode } from "@lexical/code";
 import { LinkNode } from "@lexical/link";
 import { ParagraphNode, TextNode } from "lexical";
-import { getSharedDoc, getSharedProvider, checkAndSync, isAdmin } from "../utils/collaboration";
+import { getSharedDoc, getSharedProvider, isAdmin } from "../utils/collaboration";
 
-// Auto-save logic component
 function AutoSavePlugin() {
   const [editor] = useLexicalComposerContext();
-
   useEffect(() => {
     let timeout;
     const save = () => {
@@ -32,14 +30,11 @@ function AutoSavePlugin() {
         }).catch(err => console.error("Save failed", err));
       });
     };
-
-    // Listen for updates and debounce to prevent spamming the server
     return editor.registerUpdateListener(() => {
       clearTimeout(timeout);
-      timeout = setTimeout(save, 2000); // Saves 2 seconds after last change
+      timeout = setTimeout(save, 2000);
     });
   }, [editor]);
-
   return null;
 }
 
@@ -48,10 +43,15 @@ const USERNAME = USERNAMES[Math.floor(Math.random() * USERNAMES.length)];
 
 export default function Editor() {
   const readonly = !isAdmin();
-  useEffect(() => { checkAndSync(); }, []);
+  const [isSynced, setIsSynced] = useState(false);
 
   const doc = useMemo(() => getSharedDoc(), []);
-  const provider = useMemo(() => getSharedProvider({ readonly, username: USERNAME }), [readonly]);
+  const provider = useMemo(() => {
+    const p = getSharedProvider({ readonly, username: USERNAME });
+    // Listen for sync event to trigger re-render
+    p.on("sync", (synced) => { if (synced) setIsSynced(true); });
+    return p;
+  }, [readonly]);
 
   const providerFactory = (id, yjsDocMap) => {
     yjsDocMap.set(id, doc);
@@ -67,7 +67,8 @@ export default function Editor() {
   };
 
   return (
-    <LexicalComposer initialConfig={initialConfig}>
+    // The 'key' ensures that Lexical re-initializes ONLY after the data has arrived
+    <LexicalComposer key={isSynced ? "synced" : "loading"} initialConfig={initialConfig}>
       <div className="editor-container">
         <CollaborationPlugin
           id="crousia-editor"
@@ -77,7 +78,7 @@ export default function Editor() {
         <AutoSavePlugin />
         <RichTextPlugin
           contentEditable={<ContentEditable className="editor-input" />}
-          placeholder={<div>Start writing...</div>}
+          placeholder={<div>Loading content...</div>}
           ErrorBoundary={LexicalErrorBoundary}
         />
         <HistoryPlugin />
