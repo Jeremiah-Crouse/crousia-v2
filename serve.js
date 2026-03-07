@@ -24,7 +24,7 @@ if (!fs.existsSync(ARCHIVES_DIR)) {
 }
 
 // 1. Initialize persistence instance
-const ldb = new LeveldbPersistence(LDB_PATH);
+let ldb = new LeveldbPersistence(LDB_PATH);
 
 app.use(express.json());
 
@@ -113,19 +113,16 @@ wss.on("connection", (conn, req) => {
   setupWSConnection(conn, req, { docName: "crousia-shared-room" });
 });
 
-// Remove any attempts to call .db.open()
 async function startServer() {
   try {
-    // 1. Just instantiate it. Let the library handle the connection.
+    // Now you can assign to ldb without a TypeError
     ldb = new LeveldbPersistence(LDB_PATH);
     
-    // 2. Perform a "ping" operation to ensure the DB is accessible.
-    // This forces the library to trigger its internal open() logic.
+    // Ping to verify connectivity
     await ldb.getYDoc('init-check'); 
     
     console.log('✅ LevelDB is confirmed open.');
     
-    // 3. NOW start the HTTP server
     server.listen(PORT, HOST, () => {
       console.log(`🚀 Server running on http://${HOST}:${PORT}`);
     });
