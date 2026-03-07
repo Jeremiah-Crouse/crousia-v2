@@ -1,5 +1,5 @@
 // src/components/Editor.jsx
-import React, { useMemo, useEffect, useState } from "react";
+import React, { useMemo, useEffect, useCallback } from "react";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
@@ -14,10 +14,12 @@ import { ListNode, ListItemNode } from "@lexical/list";
 import { CodeNode } from "@lexical/code";
 import { LinkNode } from "@lexical/link";
 import { ParagraphNode, TextNode } from "lexical";
-import { getSharedDoc, getSharedProvider, isAdmin } from "../utils/collaboration";
+import { getSharedDoc, getSharedProvider, checkAndSync, isAdmin } from "../utils/collaboration";
 
+// Auto-save logic component
 function AutoSavePlugin() {
   const [editor] = useLexicalComposerContext();
+
   useEffect(() => {
     let timeout;
     const save = () => {
@@ -30,11 +32,14 @@ function AutoSavePlugin() {
         }).catch(err => console.error("Save failed", err));
       });
     };
+
+    // Listen for updates and debounce to prevent spamming the server
     return editor.registerUpdateListener(() => {
       clearTimeout(timeout);
-      timeout = setTimeout(save, 2000);
+      timeout = setTimeout(save, 2000); // Saves 2 seconds after last change
     });
   }, [editor]);
+
   return null;
 }
 
@@ -43,27 +48,10 @@ const USERNAME = USERNAMES[Math.floor(Math.random() * USERNAMES.length)];
 
 export default function Editor() {
   const readonly = !isAdmin();
-  const [isSynced, setIsSynced] = useState(false);
+  useEffect(() => { checkAndSync(); }, []);
 
   const doc = useMemo(() => getSharedDoc(), []);
-  
-  // Initialize provider and sync state
-  const provider = useMemo(() => {
-    return getSharedProvider({ readonly, username: USERNAME });
-  }, [readonly]);
-
-  useEffect(() => {
-    // Check initial state
-    setIsSynced(provider.synced);
-
-    // Set up event listeners
-    const handleSync = (synced) => setIsSynced(synced);
-    provider.on("sync", handleSync);
-    
-    return () => {
-      provider.off("sync", handleSync);
-    };
-  }, [provider]);
+  const provider = useMemo(() => getSharedProvider({ readonly, username: USERNAME }), [readonly]);
 
   const providerFactory = (id, yjsDocMap) => {
     yjsDocMap.set(id, doc);
@@ -79,32 +67,22 @@ export default function Editor() {
   };
 
   return (
-    <div className="editor-container">
-      {/* Container visibility logic */}
-      <div style={{ opacity: isSynced ? 1 : 0, transition: 'opacity 0.3s' }}>
-        <LexicalComposer initialConfig={initialConfig}>
-          <CollaborationPlugin
-            id="crousia-editor"
-            providerFactory={providerFactory}
-            username={USERNAME}
-          />
-          <AutoSavePlugin />
-          <RichTextPlugin
-            contentEditable={<ContentEditable className="editor-input" />}
-            placeholder={<div>Loading content...</div>}
-            ErrorBoundary={LexicalErrorBoundary}
-          />
-          <HistoryPlugin />
-          <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
-        </LexicalComposer>
+    <LexicalComposer initialConfig={initialConfig}>
+      <div className="editor-container">
+        <CollaborationPlugin
+          id="crousia-editor"
+          providerFactory={providerFactory}
+          username={USERNAME}
+        />
+        <AutoSavePlugin />
+        <RichTextPlugin
+          contentEditable={<ContentEditable className="editor-input" />}
+          placeholder={<div>Start writing...</div>}
+          ErrorBoundary={LexicalErrorBoundary}
+        />
+        <HistoryPlugin />
+        <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
       </div>
-
-      {/* Loading overlay */}
-      {!isSynced && (
-        <div className="editor-placeholder">
-          Loading content from archive...
-        </div>
-      )}
-    </div>
+    </LexicalComposer>
   );
 }

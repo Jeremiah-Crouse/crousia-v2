@@ -27,7 +27,15 @@ export const forceReconnect = () => {
 
 // ----- Check if need to force sync on return -----
 export const checkAndSync = () => {
-  pass;
+  if (provider) {
+    const now = Date.now();
+    const timeSinceLastSync = now - lastSyncTime;
+    
+    if (timeSinceLastSync > 5000) {
+      console.log("🔄 Detected return to page, forcing sync...");
+      forceReconnect();
+    }
+  }
 };
 
 // ----- Create WebSocket Provider -----
