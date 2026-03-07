@@ -24,23 +24,16 @@ if (!fs.existsSync(ARCHIVES_DIR)) {
   fs.mkdirSync(ARCHIVES_DIR, { recursive: true });
 }
 
-// 1. Initialize persistence instance
-const db = new Level(LDB_PATH);
-let ldb = new LeveldbPersistence(db);
+// Global variables declared with 'let' to allow initialization inside startServer
+let db;
+let ldb;
 
 app.use(express.json());
 
-async function yjsDocToMarkdown(doc) {
+function yjsDocToMarkdown(doc) {
   try {
-    // Ensure the document has content loaded before stringifying
-    // y-leveldb documents need to be fully synced
     const xmlText = doc.getXmlText('content');
-    
-    // Explicit check to ensure the fragment exists and is accessible
-    if (!xmlText) return '';
-    
-    // Return the string representation
-    return xmlText.toString();
+    return xmlText ? xmlText.toString() : '';
   } catch (e) {
     console.error('CRITICAL: Error accessing Yjs document fragment:', e);
     return '';
@@ -50,12 +43,12 @@ async function yjsDocToMarkdown(doc) {
 // API Routes
 app.post('/api/archive-today', async (req, res) => {
   try {
+    if (!ldb) throw new Error("Database not initialized");
+
     const today = new Date().toISOString().split('T')[0];
     const archivePath = path.join(ARCHIVES_DIR, `${today}.md`);
     
-    // getYDoc will now succeed because we awaited open() in startup
     const ydoc = await ldb.getYDoc('crousia-shared-room');
-    
     if (!ydoc) throw new Error("Could not retrieve YDoc");
     
     const markdown = yjsDocToMarkdown(ydoc);
@@ -124,11 +117,11 @@ wss.on("connection", (conn, req) => {
 
 async function startServer() {
   try {
-    // Now you can assign to ldb without a TypeError
+    // Correct initialization sequence
     db = new Level(LDB_PATH);
     ldb = new LeveldbPersistence(db);
     
-    // Ping to verify connectivity
+    // Ping to verify connectivity before opening ports
     await ldb.getYDoc('init-check'); 
     
     console.log('✅ LevelDB is confirmed open.');
@@ -142,4 +135,5 @@ async function startServer() {
   }
 }
 
+// Start the sequence
 startServer();
