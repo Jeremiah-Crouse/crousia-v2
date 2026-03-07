@@ -117,11 +117,20 @@ wss.on("connection", (conn, req) => {
 
 async function startServer() {
   try {
-    // Correct initialization sequence
-    db = new Level(LDB_PATH);
-    ldb = new LeveldbPersistence(db);
+    // HARDCODED absolute path. 
+    // Do not use variables or path.join here for this test.
+    const hardcodedPath = '/root/crousia-v2/crousia-db';
     
-    // Ping to verify connectivity before opening ports
+    console.log('DEBUG: Attempting to open LevelDB at path:', hardcodedPath);
+
+    // Verify it's a string before passing
+    if (typeof hardcodedPath !== 'string' || hardcodedPath.length === 0) {
+      throw new Error('Path is not a valid string!');
+    }
+
+    ldb = new LeveldbPersistence(hardcodedPath);
+    
+    // Ping to verify
     await ldb.getYDoc('init-check'); 
     
     console.log('✅ LevelDB is confirmed open.');
@@ -130,7 +139,7 @@ async function startServer() {
       console.log(`🚀 Server running on http://${HOST}:${PORT}`);
     });
   } catch (err) {
-    console.error('❌ Failed to open LevelDB:', err);
+    console.error('❌ FATAL: Failed to open LevelDB:', err);
     process.exit(1);
   }
 }
