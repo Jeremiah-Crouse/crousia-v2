@@ -67,19 +67,17 @@ app.post('/api/archive-today', async (req, res) => {
 
 // Add this temporarily to serve.js
 app.get('/api/debug-peek', (req, res) => {
-  const sharedType = sharedDoc.get('root');
+  // Access the internal map of shared types
+  const sharedTypes = Array.from(sharedDoc.share.keys());
   
-  if (!sharedType) {
-    return res.json({ error: "Root is null" });
-  }
+  // Try to grab the first available type if 'root' doesn't exist
+  const firstKey = sharedTypes[0];
+  const content = firstKey ? sharedDoc.get(firstKey).toJSON() : "NO_TYPES_FOUND";
 
-  // Get the actual object structure
-  const rawData = sharedType.toJSON();
-  
-  // Return both the content AND the keys so we can find your text
   res.json({
-    keys: Object.keys(rawData),
-    content: rawData
+    allKeys: sharedTypes,
+    firstKeyUsed: firstKey,
+    content: content
   });
 });
 
