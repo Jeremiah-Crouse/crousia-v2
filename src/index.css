@@ -52,6 +52,9 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
+.text-gold { color: #FFD700; font-weight: bold; }
+.text-purple { color: #800080; font-weight: bold; }
+
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;

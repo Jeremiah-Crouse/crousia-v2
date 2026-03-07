@@ -7,6 +7,13 @@ let doc = null;
 let provider = null;
 let lastSyncTime = 0;
 
+// Add a helper to get the color
+const getUserColor = (username) => {
+  if (username === "King Jeremiah") return "#FFD700"; // Gold
+  if (username === "Queen Lauren") return "#800080";  // Purple
+  return "#808080"; // Default Gray
+};
+
 // ----- Get or create Y.Doc -----
 export const getSharedDoc = () => {
   if (!doc) {
@@ -61,7 +68,7 @@ export const getSharedProvider = ({ readonly = false, username = "guest" } = {})
 
     provider.awareness.setLocalStateField('user', {
       name: username,
-      color: "#" + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, "0"),
+      color: getUserColor(username), 
     });
   }
   return provider;
