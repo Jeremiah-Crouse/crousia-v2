@@ -75,7 +75,13 @@ export default function Editor() {
     editable: !readonly,
     nodes: [ParagraphNode, TextNode, HeadingNode, QuoteNode, ListNode, ListItemNode, CodeNode, LinkNode],
     theme: { paragraph: "editor-paragraph" },
-    onError(error) { console.error("Lexical error:", error); }
+    onError(error) { 
+      console.error("Lexical error:", error);
+      // If we hit error #92, force a page reload to recover state
+      if (error.message.includes('#92')) {
+        window.location.reload(); 
+      }
+    }
   };
 
   return (
