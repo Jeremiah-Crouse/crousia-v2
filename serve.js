@@ -30,36 +30,45 @@ const provider = new WebsocketProvider(
 app.use(express.json());
 
 // 3. API Routes
+// Add these to your serve.js, replacing the old ones
 app.post('/api/archive-today', async (req, res) => {
+  if (!provider.synced) {
+    return res.status(503).json({ error: "Server sync in progress. Try again in a few seconds." });
+  }
+
   const rootType = sharedDoc.get('root');
+  // Use recursion to find text regardless of the Yjs type (Map/Array/Fragment)
+  const extractText = (node) => {
+    if (!node) return '';
+    if (typeof node.toString === 'function' && node.constructor.name !== 'Doc') {
+      const val = node.toString();
+      if (val.length > 0) return val;
+    }
+    if (typeof node.toArray === 'function') {
+      return node.toArray().map(extractText).join('\n');
+    }
+    return '';
+  };
+
+  const markdown = extractText(rootType);
+  const today = new Date().toISOString().split('T')[0];
+  const archivePath = path.join(ARCHIVES_DIR, `${today}.md`);
   
-  // Let's log the actual prototype of the object
-  console.log('DEBUG: Prototype of root:', Object.getPrototypeOf(rootType).constructor.name);
-  
-  // If it's a Y.Map, let's list every single key it contains
-  if (rootType.constructor.name === 'Map') {
-      console.log('DEBUG: Map keys:', Array.from(rootType.keys()));
-  }
-  
-  // If it's an XmlFragment, let's see its children
-  if (rootType.constructor.name === 'XmlFragment') {
-      console.log('DEBUG: XmlFragment child count:', rootType.length);
-  }
-  
-  res.json({ status: "Check console logs" });
+  fs.writeFileSync(archivePath, markdown);
+  console.log(`📦 Archived: ${today}.md - ${markdown.length} chars`);
+  res.json({ success: true, date: today, chars: markdown.length });
 });
 
 app.get('/api/debug-surgical', (req, res) => {
   const root = sharedDoc.get('root');
-  
-  // Use .toArray() to inspect the actual children of the root node
   const children = typeof root.toArray === 'function' ? root.toArray() : [];
   
   res.json({
+    synced: provider.synced,
     type: root ? root.constructor.name : 'null',
     childCount: children.length,
-    // Peek at the first 3 child types to see how data is structured
-    childTypes: children.slice(0, 3).map(c => c.constructor.name)
+    childTypes: children.slice(0, 5).map(c => c.constructor.name),
+    isEmpty: sharedDoc.isEmpty
   });
 });
 
@@ -88,6 +97,14 @@ app.get('/api/archive/:date', (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// Add this check to your API routes
+app.get('/api/status', (req, res) => {
+  res.json({
+    synced: provider.synced,
+    isLocalEmpty: sharedDoc.isEmpty // True if it hasn't received data yet
+  });
 });
 
 // 4. Static Hosting
