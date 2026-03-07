@@ -65,6 +65,19 @@ app.post('/api/archive-today', async (req, res) => {
   }
 });
 
+// Add this temporarily to serve.js
+app.get('/api/debug-peek', (req, res) => {
+  const sharedType = sharedDoc.get('root');
+  const rawData = sharedType ? sharedType.toJSON() : "NULL_TYPE";
+  
+  console.log('DEBUG: Peeking at root content:', rawData);
+  
+  res.json({
+    type: typeof sharedType,
+    content: rawData
+  });
+});
+
 app.get('/api/archives', (req, res) => {
   try {
     const files = fs.readdirSync(ARCHIVES_DIR)
