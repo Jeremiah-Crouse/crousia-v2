@@ -52,15 +52,15 @@ app.post('/api/archive-today', async (req, res) => {
 app.get('/api/debug-surgical', (req, res) => {
   const root = sharedDoc.get('root');
   
-  // Don't stringify the whole thing, just check metadata
-  const metadata = {
+  // Use .toArray() to inspect the actual children of the root node
+  const children = typeof root.toArray === 'function' ? root.toArray() : [];
+  
+  res.json({
     type: root ? root.constructor.name : 'null',
-    length: root && typeof root.length !== 'undefined' ? root.length : 'N/A',
-    // Check if it's an XmlElement/Fragment
-    childCount: root && typeof root.toArray === 'function' ? root.toArray().length : 'N/A'
-  };
-
-  res.json(metadata);
+    childCount: children.length,
+    // Peek at the first 3 child types to see how data is structured
+    childTypes: children.slice(0, 3).map(c => c.constructor.name)
+  });
 });
 
 app.get('/api/archives', (req, res) => {
