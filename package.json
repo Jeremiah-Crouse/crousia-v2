@@ -44,7 +44,8 @@
     "vite": "^8.0.0-beta.13"
   },
   "overrides": {
-    "vite": "^8.0.0-beta.13"
+    "vite": "^8.0.0-beta.13",
+    "classic-level": "level"
   },
   "description": "This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.",
   "main": "eslint.config.js",
