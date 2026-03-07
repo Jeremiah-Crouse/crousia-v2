@@ -1,47 +1,43 @@
 // serve.js
 import express from "express";
+import http from "http";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import http from "http";
 import * as Y from "yjs";
+import { WebsocketProvider } from "y-websocket";
+import WebSocket from "ws";
 
 const app = express();
 const PORT = 5000;
 const HOST = "0.0.0.0";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const ARCHIVES_DIR = '/root/crousia-v2/archives';
 
-if (!fs.existsSync(ARCHIVES_DIR)) {
-  fs.mkdirSync(ARCHIVES_DIR, { recursive: true });
-}
+if (!fs.existsSync(ARCHIVES_DIR)) fs.mkdirSync(ARCHIVES_DIR, { recursive: true });
+
+// 1. The shared document, kept in sync by the provider
+const sharedDoc = new Y.Doc();
+
+// 2. Connect as a client to the binary sync server (port 1234)
+// This keeps the sync binary as the "Owner" of the LevelDB lock
+const provider = new WebsocketProvider(
+  'ws://localhost:1234', 
+  'crousia-shared-room', 
+  sharedDoc,
+  { WebSocketPolyfill: WebSocket }
+);
 
 app.use(express.json());
 
-// API Route: Archive Today
-// This fetches the current Yjs state from server-sync.js (Port 5001)
-app.post('/api/archive-today', async (req, res) => {
+// 3. API Routes
+app.post('/api/archive-today', (req, res) => {
   try {
-    // 1. Fetch the latest binary state snapshot from the sync server
-    const response = await fetch('http://127.0.0.1:5001/internal-state');
-    if (!response.ok) throw new Error("Could not reach sync server");
-    
-    const update = new Uint8Array(await response.arrayBuffer());
-    
-    // 2. Reconstruct document in memory
-    const doc = new Y.Doc();
-    Y.applyUpdate(doc, update);
-    const markdown = doc.getXmlText('content')?.toString() || '';
-    
-    // 3. Save to disk
+    // Because the provider is connected, sharedDoc is always up-to-date in RAM
+    const markdown = sharedDoc.getXmlText('content')?.toString() || '';
     const today = new Date().toISOString().split('T')[0];
     const archivePath = path.join(ARCHIVES_DIR, `${today}.md`);
-    fs.writeFileSync(archivePath, markdown);
     
-    console.log(`📦 Archived: ${today}.md - ${markdown.length} chars`);
+    fs.writeFileSync(archivePath, markdown);
     res.json({ success: true, date: today, chars: markdown.length });
   } catch (e) {
     console.error('Archive error:', e);
@@ -49,7 +45,6 @@ app.post('/api/archive-today', async (req, res) => {
   }
 });
 
-// Existing API Routes
 app.get('/api/archives', (req, res) => {
   try {
     const files = fs.readdirSync(ARCHIVES_DIR)
@@ -64,13 +59,21 @@ app.get('/api/archives', (req, res) => {
 });
 
 app.get('/api/archive/:date', (req, res) => {
-  const { date } = req.params;
-  const p = path.join(ARCHIVES_DIR, `${date}.md`);
-  if (fs.existsSync(p)) res.json({ date, content: fs.readFileSync(p, 'utf-8') });
-  else res.status(404).json({ error: 'Not found' });
+  try {
+    const { date } = req.params;
+    const p = path.join(ARCHIVES_DIR, `${date}.md`);
+    if (fs.existsSync(p)) {
+      res.json({ date, content: fs.readFileSync(p, 'utf-8') });
+    } else {
+      res.status(404).json({ error: 'Not found' });
+    }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-// Static Hosting
+// 4. Static Hosting
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 app.use(express.static(path.join(__dirname, "dist")));
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, "dist/index.html"));
@@ -78,5 +81,5 @@ app.use((req, res) => {
 
 const server = http.createServer(app);
 server.listen(PORT, HOST, () => {
-  console.log(`🚀 Web/Archive Server running on http://${HOST}:${PORT}`);
+  console.log(`🚀 Federated Server running on http://${HOST}:${PORT}`);
 });
