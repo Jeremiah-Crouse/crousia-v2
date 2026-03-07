@@ -41,26 +41,23 @@ function yjsDocToMarkdown(doc) {
 // API Routes
 app.post('/api/archive-today', async (req, res) => {
   try {
-    // 1. Force the database to open if it's not already
-    // classic-level instances often require an explicit open call 
-    // when running in restricted environments
-    if (!ldb.persistence.db.status || ldb.persistence.db.status === 'closed') {
-        await ldb.persistence.db.open();
-    }
-
     const today = new Date().toISOString().split('T')[0];
     const archivePath = path.join(ARCHIVES_DIR, `${today}.md`);
     
-    // 2. Retrieve document
+    // y-leveldb automatically handles the connection when you call getYDoc
     const ydoc = await ldb.getYDoc('crousia-shared-room');
     
     if (!ydoc) throw new Error("Could not retrieve YDoc");
     
     const markdown = yjsDocToMarkdown(ydoc);
+    
     fs.writeFileSync(archivePath, markdown);
+    console.log(`📦 Archived: ${today}.md - ${markdown.length} chars`);
     
     res.json({ success: true, date: today, chars: markdown.length });
   } catch (e) {
+    // If the database is closed, y-leveldb will throw an error here 
+    // which we catch and report clearly
     console.error('Archive error:', e);
     res.status(500).json({ error: e.message });
   }
