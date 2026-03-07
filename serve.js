@@ -30,46 +30,13 @@ const provider = new WebsocketProvider(
 app.use(express.json());
 
 // 3. API Routes
-// Add these to your serve.js, replacing the old ones
-app.post('/api/archive-today', async (req, res) => {
-  if (!provider.synced) {
-    return res.status(503).json({ error: "Server sync in progress. Try again in a few seconds." });
-  }
-
-  const rootType = sharedDoc.get('root');
-  // Use recursion to find text regardless of the Yjs type (Map/Array/Fragment)
-  const extractText = (node) => {
-    if (!node) return '';
-    if (typeof node.toString === 'function' && node.constructor.name !== 'Doc') {
-      const val = node.toString();
-      if (val.length > 0) return val;
-    }
-    if (typeof node.toArray === 'function') {
-      return node.toArray().map(extractText).join('\n');
-    }
-    return '';
-  };
-
-  const markdown = extractText(rootType);
+app.post('/api/archive-today', express.json(), (req, res) => {
+  const { content } = req.body;
   const today = new Date().toISOString().split('T')[0];
   const archivePath = path.join(ARCHIVES_DIR, `${today}.md`);
   
-  fs.writeFileSync(archivePath, markdown);
-  console.log(`📦 Archived: ${today}.md - ${markdown.length} chars`);
-  res.json({ success: true, date: today, chars: markdown.length });
-});
-
-app.get('/api/debug-surgical', (req, res) => {
-  const root = sharedDoc.get('root');
-  const children = typeof root.toArray === 'function' ? root.toArray() : [];
-  
-  res.json({
-    synced: provider.synced,
-    type: root ? root.constructor.name : 'null',
-    childCount: children.length,
-    childTypes: children.slice(0, 5).map(c => c.constructor.name),
-    isEmpty: sharedDoc.isEmpty
-  });
+  fs.writeFileSync(archivePath, content);
+  res.json({ success: true, length: content.length });
 });
 
 app.get('/api/archives', (req, res) => {
