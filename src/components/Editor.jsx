@@ -67,23 +67,35 @@ export default function Editor() {
   };
 
   return (
-    // The 'key' ensures that Lexical re-initializes ONLY after the data has arrived
-    <LexicalComposer key={isSynced ? "synced" : "loading"} initialConfig={initialConfig}>
-      <div className="editor-container">
-        <CollaborationPlugin
-          id="crousia-editor"
-          providerFactory={providerFactory}
-          username={USERNAME}
-        />
-        <AutoSavePlugin />
-        <RichTextPlugin
-          contentEditable={<ContentEditable className="editor-input" />}
-          placeholder={<div>Loading content...</div>}
-          ErrorBoundary={LexicalErrorBoundary}
-        />
-        <HistoryPlugin />
-        <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
+    <div className="editor-container">
+      {/* Don't use key={...} here. 
+         Keep the editor mounted so the WebSocket connection remains stable. 
+         Use opacity or display to hide until synced.
+      */}
+      <div style={{ opacity: isSynced ? 1 : 0, transition: 'opacity 0.3s' }}>
+        <LexicalComposer initialConfig={initialConfig}>
+          <CollaborationPlugin
+            id="crousia-editor"
+            providerFactory={providerFactory}
+            username={USERNAME}
+          />
+          <AutoSavePlugin />
+          <RichTextPlugin
+            contentEditable={<ContentEditable className="editor-input" />}
+            placeholder={<div>Loading content...</div>}
+            ErrorBoundary={LexicalErrorBoundary}
+          />
+          <HistoryPlugin />
+          <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
+        </LexicalComposer>
       </div>
-    </LexicalComposer>
+
+      {/* Show a friendly loading indicator */}
+      {!isSynced && (
+        <div className="editor-placeholder">
+          Loading content from archive...
+        </div>
+      )}
+    </div>
   );
 }
