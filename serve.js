@@ -66,19 +66,28 @@ app.post('/api/archive-today', async (req, res) => {
 });
 
 // Add this temporarily to serve.js
-app.get('/api/debug-peek', (req, res) => {
-  // Access the internal map of shared types
-  const sharedTypes = Array.from(sharedDoc.share.keys());
-  
-  // Try to grab the first available type if 'root' doesn't exist
-  const firstKey = sharedTypes[0];
-  const content = firstKey ? sharedDoc.get(firstKey).toJSON() : "NO_TYPES_FOUND";
-
-  res.json({
-    allKeys: sharedTypes,
-    firstKeyUsed: firstKey,
-    content: content
-  });
+app.post('/api/archive-today', async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const archivePath = path.join(ARCHIVES_DIR, `${today}.md`);
+    
+    // Get the object directly
+    const rootType = sharedDoc.get('root');
+    
+    // If it's XmlText/XmlFragment, use the .toString() method
+    // If it's a Y.Text, it also has a .toString() method
+    const markdown = rootType.toString();
+    
+    // Write the result
+    fs.writeFileSync(archivePath, markdown);
+    
+    console.log(`📦 Archived: ${today}.md - ${markdown.length} chars`);
+    res.json({ success: true, date: today, chars: markdown.length });
+  } catch (e) {
+    // If .toString() fails, we log the type to help us debug the structure
+    console.error('Archive error:', e);
+    res.status(500).json({ error: "Could not extract text from 'root'" });
+  }
 });
 
 app.get('/api/archives', (req, res) => {
