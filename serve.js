@@ -21,7 +21,7 @@ const PROOT_ROOT = '/data/data/com.termux/files/usr/var/lib/proot-distro/install
 const ARCHIVES_DIR = path.join(PROOT_ROOT, 'crousia-v2', 'archives');
 const LDB_PATH = path.join(PROOT_ROOT, 'crousia-v2', 'crousia-db');
 
-// Ensure directories
+// Ensure directories exist
 if (!fs.existsSync(ARCHIVES_DIR)) {
   fs.mkdirSync(ARCHIVES_DIR, { recursive: true });
 }
@@ -29,20 +29,23 @@ if (!fs.existsSync(ARCHIVES_DIR)) {
 // Global persistence instance
 let ldb;
 
-// Initialize Persistence
-try {
-  ldb = new LeveldbPersistence(LDB_PATH);
-  console.log('✅ LevelDB persistence initialized.');
-} catch (e) {
-  console.error('❌ Failed to initialize LevelDB:', e);
-  process.exit(1);
+// Initialize Persistence safely
+async function initDatabase() {
+  try {
+    ldb = new LeveldbPersistence(LDB_PATH);
+    // Trigger an operation to force connection opening without accessing private properties
+    await ldb.getYDoc('init-check'); 
+    console.log('✅ LevelDB persistence initialized and ready.');
+  } catch (e) {
+    console.error('❌ Failed to initialize LevelDB:', e);
+    process.exit(1);
+  }
 }
 
 app.use(express.json());
 
 function yjsDocToMarkdown(doc) {
   try {
-    // Safely get the content fragment
     const xmlText = doc.getXmlText('content');
     return xmlText ? xmlText.toString() : '';
   } catch (e) {
@@ -56,19 +59,13 @@ app.post('/api/archive-today', async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     const archivePath = path.join(ARCHIVES_DIR, `${today}.md`);
     
-    // Retrieve Yjs document
     const ydoc = await ldb.getYDoc('crousia-shared-room');
-    
-    if (!ydoc) {
-      throw new Error("Could not retrieve YDoc from database");
-    }
+    if (!ydoc) throw new Error("Could not retrieve YDoc");
     
     const markdown = yjsDocToMarkdown(ydoc);
-    
-    // Save to file
     fs.writeFileSync(archivePath, markdown);
-    console.log(`📦 Archived: ${today}.md - ${markdown.length} chars`);
     
+    console.log(`📦 Archived: ${today}.md - ${markdown.length} chars`);
     res.json({ success: true, date: today, chars: markdown.length });
   } catch (e) {
     console.error('Archive error:', e);
@@ -84,21 +81,6 @@ app.get('/api/archives', (req, res) => {
       .sort()
       .reverse();
     res.json({ archives: files });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.get('/api/archive/:date', (req, res) => {
-  try {
-    const { date } = req.params;
-    const archivePath = path.join(ARCHIVES_DIR, `${date}.md`);
-    
-    if (fs.existsSync(archivePath)) {
-      res.json({ date, content: fs.readFileSync(archivePath, 'utf-8') });
-    } else {
-      res.status(404).json({ error: 'Not found' });
-    }
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -129,6 +111,9 @@ wss.on("connection", (conn, req) => {
   setupWSConnection(conn, req, { docName: "crousia-shared-room" });
 });
 
-server.listen(PORT, HOST, () => {
-  console.log(`🚀 Server running on http://${HOST}:${PORT}`);
+// Run initialization before starting the server
+initDatabase().then(() => {
+  server.listen(PORT, HOST, () => {
+    console.log(`🚀 Server running on http://${HOST}:${PORT}`);
+  });
 });
