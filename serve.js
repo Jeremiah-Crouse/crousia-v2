@@ -31,63 +31,22 @@ app.use(express.json());
 
 // 3. API Routes
 app.post('/api/archive-today', async (req, res) => {
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    const archivePath = path.join(ARCHIVES_DIR, `${today}.md`);
-    
-    const sharedType = sharedDoc.get('root');
-    
-    // --- FORCE DEBUG: What is actually in the document? ---
-    const rawData = sharedType ? sharedType.toJSON() : "NULL_TYPE";
-    console.log('DEBUG: Full document content:', JSON.stringify(rawData, null, 2));
-    // ------------------------------------------------------
-
-    if (!sharedType) {
-      throw new Error("Shared type 'root' is empty");
-    }
-
-    // Attempt to extract text from common Yjs structures
-    let markdown = "";
-    if (typeof rawData === 'string') {
-      markdown = rawData;
-    } else if (typeof rawData === 'object') {
-      // Often text is stored in a 'text' property or is an array of objects
-      markdown = JSON.stringify(rawData, null, 2); 
-    }
-
-    fs.writeFileSync(archivePath, markdown);
-    console.log(`📦 Archived: ${today}.md - ${markdown.length} chars`);
-    
-    res.json({ success: true, date: today, chars: markdown.length });
-  } catch (e) {
-    console.error('Archive error:', e);
-    res.status(500).json({ error: e.message });
+  const rootType = sharedDoc.get('root');
+  
+  // Let's log the actual prototype of the object
+  console.log('DEBUG: Prototype of root:', Object.getPrototypeOf(rootType).constructor.name);
+  
+  // If it's a Y.Map, let's list every single key it contains
+  if (rootType.constructor.name === 'Map') {
+      console.log('DEBUG: Map keys:', Array.from(rootType.keys()));
   }
-});
-
-// Add this temporarily to serve.js
-app.post('/api/archive-today', async (req, res) => {
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    const archivePath = path.join(ARCHIVES_DIR, `${today}.md`);
-    
-    // Get the object directly
-    const rootType = sharedDoc.get('root');
-    
-    // If it's XmlText/XmlFragment, use the .toString() method
-    // If it's a Y.Text, it also has a .toString() method
-    const markdown = rootType.toString();
-    
-    // Write the result
-    fs.writeFileSync(archivePath, markdown);
-    
-    console.log(`📦 Archived: ${today}.md - ${markdown.length} chars`);
-    res.json({ success: true, date: today, chars: markdown.length });
-  } catch (e) {
-    // If .toString() fails, we log the type to help us debug the structure
-    console.error('Archive error:', e);
-    res.status(500).json({ error: "Could not extract text from 'root'" });
+  
+  // If it's an XmlFragment, let's see its children
+  if (rootType.constructor.name === 'XmlFragment') {
+      console.log('DEBUG: XmlFragment child count:', rootType.length);
   }
+  
+  res.json({ status: "Check console logs" });
 });
 
 app.get('/api/archives', (req, res) => {
