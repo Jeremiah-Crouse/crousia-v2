@@ -21,8 +21,8 @@ const sharedDoc = new Y.Doc();
 // 2. Connect as a client to the binary sync server (port 1234)
 // This keeps the sync binary as the "Owner" of the LevelDB lock
 const provider = new WebsocketProvider(
-  'ws://localhost:1234', 
-  'crousia-shared-room', 
+  'wss://admin.crousia.com/ysl', // Match the client's URL
+  'crousia-shared-room',         // Ensure this room name matches perfectly
   sharedDoc,
   { WebSocketPolyfill: WebSocket }
 );
