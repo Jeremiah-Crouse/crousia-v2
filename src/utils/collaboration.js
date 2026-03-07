@@ -62,12 +62,11 @@ export const getSharedProvider = ({ readonly = false, username = "guest" } = {})
 // ----- Clear shared data -----
 export const clearSharedData = async () => {
   if (doc) {
-    doc.destroy();
-    doc = null;
-    provider = null;
-    console.log("🧹 Y.Doc destroyed");
+    // Instead of destroy, clear the contents
+    doc.getMap('root').clear(); 
+    // Or just reload
+    window.location.reload();
   }
-  window.location.reload();
 };
 
 // ----- Check if user is admin -----
