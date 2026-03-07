@@ -23,7 +23,7 @@ if (!fs.existsSync(ARCHIVES_DIR)) {
   fs.mkdirSync(ARCHIVES_DIR, { recursive: true });
 }
 
-// Global persistence instance - initialized immediately
+// 1. Initialize persistence instance
 const ldb = new LeveldbPersistence(LDB_PATH);
 
 app.use(express.json());
@@ -44,7 +44,7 @@ app.post('/api/archive-today', async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     const archivePath = path.join(ARCHIVES_DIR, `${today}.md`);
     
-    // y-leveldb automatically handles the connection when you call getYDoc
+    // getYDoc will now succeed because we awaited open() in startup
     const ydoc = await ldb.getYDoc('crousia-shared-room');
     
     if (!ydoc) throw new Error("Could not retrieve YDoc");
@@ -56,8 +56,6 @@ app.post('/api/archive-today', async (req, res) => {
     
     res.json({ success: true, date: today, chars: markdown.length });
   } catch (e) {
-    // If the database is closed, y-leveldb will throw an error here 
-    // which we catch and report clearly
     console.error('Archive error:', e);
     res.status(500).json({ error: e.message });
   }
@@ -115,6 +113,19 @@ wss.on("connection", (conn, req) => {
   setupWSConnection(conn, req, { docName: "crousia-shared-room" });
 });
 
-server.listen(PORT, HOST, () => {
-  console.log(`🚀 Server running on http://${HOST}:${PORT}`);
-});
+// 2. Explicitly open the database BEFORE starting the server
+async function startServer() {
+  try {
+    await ldb.db.open();
+    console.log('✅ LevelDB successfully opened.');
+    
+    server.listen(PORT, HOST, () => {
+      console.log(`🚀 Server running on http://${HOST}:${PORT}`);
+    });
+  } catch (err) {
+    console.error('❌ Failed to open LevelDB, check for LOCK files:', err);
+    process.exit(1);
+  }
+}
+
+startServer();
