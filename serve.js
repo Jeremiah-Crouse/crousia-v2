@@ -16,21 +16,38 @@ const HOST = "0.0.0.0";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Use proot directory for LevelDB (same as y-websocket)
 const PROOT_ROOT = '/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/root';
 const ARCHIVES_DIR = path.join(PROOT_ROOT, 'crousia-v2', 'archives');
 const LDB_PATH = path.join(PROOT_ROOT, 'crousia-v2', 'crousia-db');
 
-const ldb = new LeveldbPersistence(LDB_PATH);
+// Database state
+let dbReady = false;
+let ldb;
 
+// Ensure directories
 if (!fs.existsSync(ARCHIVES_DIR)) {
   fs.mkdirSync(ARCHIVES_DIR, { recursive: true });
+}
+
+// Initialize database with readiness check
+async function initDatabase() {
+  try {
+    ldb = new LeveldbPersistence(LDB_PATH);
+    // Explicitly wait for the database to open
+    await ldb.persistence.db.open();
+    dbReady = true;
+    console.log('✅ LevelDB is open and ready.');
+  } catch (err) {
+    console.error('❌ Failed to open LevelDB:', err);
+    process.exit(1); // Fail fast if DB cannot open
+  }
 }
 
 app.use(express.json());
 
 function yjsDocToMarkdown(doc) {
   try {
+    if (!doc) return '';
     const xmlText = doc.getXmlText('content');
     return xmlText.toString() || '';
   } catch (e) {
@@ -39,31 +56,25 @@ function yjsDocToMarkdown(doc) {
   }
 }
 
-function clearYjsDoc() {
-  const doc = new Y.Doc();
-  const emptyState = Y.encodeStateAsUpdate(doc);
-  ldb.storeUpdate('crousia-shared-room', emptyState);
-  console.log('📄 Yjs doc cleared for new day');
-}
-
 app.post('/api/archive-today', async (req, res) => {
+  if (!dbReady) {
+    return res.status(503).json({ error: "Database not ready. Try again in a moment." });
+  }
+
   try {
     const today = new Date().toISOString().split('T')[0];
     const archivePath = path.join(ARCHIVES_DIR, `${today}.md`);
     
     const ydoc = await ldb.getYDoc('crousia-shared-room');
     
-    console.log('Yjs doc keys:', Array.from(ydoc.getMap().keys()));
-    console.log('Yjs xmlFragment:', ydoc.getXmlFragment('content').toString().substring(0, 200));
+    if (!ydoc) {
+        throw new Error("Could not retrieve document from LevelDB.");
+    }
     
     const markdown = yjsDocToMarkdown(ydoc);
-    console.log('Markdown:', markdown.substring(0, 200));
     
     fs.writeFileSync(archivePath, markdown);
     console.log(`📦 Archived: ${today}.md - ${markdown.length} chars`);
-    
-    // Don't clear - let the content persist for next day
-    // clearYjsDoc();
     
     res.json({ success: true, date: today, chars: markdown.length });
   } catch (e) {
@@ -102,7 +113,6 @@ app.get('/api/archive/:date', (req, res) => {
 });
 
 app.use('/archives', express.static(ARCHIVES_DIR));
-
 app.use(express.static(path.join(__dirname, "dist")));
 
 app.use((req, res, next) => {
@@ -113,16 +123,24 @@ app.use((req, res, next) => {
 });
 
 const server = http.createServer(app);
-
 const wss = new WebSocketServer({ noServer: true });
+
+server.on('upgrade', (request, socket, head) => {
+  if (request.url.startsWith('/ysl')) {
+    wss.handleUpgrade(request, socket, head, (conn) => {
+      wss.emit('connection', conn, request);
+    });
+  }
+});
 
 wss.on("connection", (conn, req) => {
   console.log("✅ Yjs WS connected!");
   setupWSConnection(conn, req, { docName: "crousia-shared-room" });
 });
 
-server.listen(PORT, HOST, () => {
-  console.log(`🚀 Server running on http://${HOST}:${PORT}`);
-  console.log(`🌐 Yjs WS endpoint at ws://${HOST}:${PORT}/ysl`);
-  console.log(`📚 Archives served at http://${HOST}:${PORT}/archives`);
+// Start the server only after the DB is initialized
+initDatabase().then(() => {
+  server.listen(PORT, HOST, () => {
+    console.log(`🚀 Server running on http://${HOST}:${PORT}`);
+  });
 });
