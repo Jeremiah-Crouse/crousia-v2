@@ -1,65 +1,55 @@
-import { WebsocketProvider } from 'y-websocket';
-import { IndexeddbPersistence } from 'y-indexeddb'; // Import this
-import * as Y from 'yjs';
+// src/utils/collaboration.js
+import * as Y from "yjs";
+import { WebsocketProvider } from "y-websocket";
 
+// ----- Shared state -----
 let doc = null;
 let provider = null;
-let persistence = null; // Track persistence
 
+// ----- Get or create Y.Doc -----
 export const getSharedDoc = () => {
   if (!doc) {
     doc = new Y.Doc();
-
-    doc.on('update', (update) => {
-        // Log all updates to see what's happening
-        // 'crousia-shared-room' is the room name
-        console.log('--- Yjs Update Size:', update.length);
-        console.log('--- Doc Content keys:', Array.from(doc.share.keys()));
-    });
-
-    console.log('--- Yjs Doc Created ---');
+    console.log("📄 New Y.Doc created");
   }
   return doc;
 };
 
-export const getSharedProvider = () => {
+// ----- Create WebSocket Provider -----
+export const getSharedProvider = ({ readonly = false, username = "guest" } = {}) => {
   if (!provider) {
-    doc = getSharedDoc();
-    provider = new WebsocketProvider('ws://localhost:8080', 'crousia-shared-room', doc);
-    
-    // Add persistence here
-    persistence = new IndexeddbPersistence('crousia-shared-room', doc);
-    
-    persistence.on('synced', () => {
-        console.log('--- Yjs Content loaded from IndexedDB ---');
+    const doc = getSharedDoc();
+
+    // WebSocket Provider (central sync - server is source of truth)
+    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const host = 'admin.crousia.com';
+    provider = new WebsocketProvider(`${protocol}://${host}/ysl`, "crousia-shared-room", doc, {
+      connect: !readonly,
     });
 
-    provider.on('status', event => {
-      console.log('--- Yjs Provider status:', event.status);
-    });
-    
-    console.log('--- Yjs Provider Created ---');
+    provider.on("status", (event) => console.log("🌟 Yjs Provider status:", event.status));
+    provider.on("sync", (isSynced) =>
+      console.log("🔗 Yjs Provider sync:", isSynced ? "✅ synced" : "❌ unsynced")
+    );
+
+    if (readonly) console.log("👀 Read-only mode active for this client");
+
+    provider.userColor = "#" + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, "0");
+    provider.username = username;
   }
   return provider;
 };
 
+// ----- Clear shared data -----
 export const clearSharedData = async () => {
-  if (persistence) {
-    await persistence.clearData();
-    console.log('--- Yjs IndexedDB cleared ---');
-  }
   if (doc) {
-    // Optionally clear in-memory doc
     doc.destroy();
     doc = null;
     provider = null;
-    persistence = null;
-    console.log('--- Yjs Doc destroyed ---');
+    console.log("🧹 Y.Doc destroyed");
   }
-  window.location.reload(); // Reload to re-initialize fresh
+  window.location.reload();
 };
 
-if (typeof window !== 'undefined') {
-  getSharedProvider();
-}
-
+// ----- Check if user is admin -----
+export const isAdmin = () => window.location.hostname.startsWith("admin.");

@@ -1,56 +1,70 @@
-import React, { useMemo } from 'react';
-import { LexicalComposer } from '@lexical/react/LexicalComposer';
-import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
-import { ContentEditable } from '@lexical/react/LexicalContentEditable';
-import { CollaborationPlugin } from '@lexical/react/LexicalCollaborationPlugin';
-import LexicalErrorBoundary from '@lexical/react/LexicalErrorBoundary';
+// src/components/Editor.jsx
+import React, { useMemo } from "react";
 
-import { ParagraphNode, TextNode } from 'lexical';
-import { HeadingNode, QuoteNode } from '@lexical/rich-text';
-import { ListNode, ListItemNode } from '@lexical/list';
-import { CodeNode } from '@lexical/code';
-import { LinkNode } from '@lexical/link';
+import { LexicalComposer } from "@lexical/react/LexicalComposer";
+import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
+import { ContentEditable } from "@lexical/react/LexicalContentEditable";
+import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
+import { CollaborationPlugin } from "@lexical/react/LexicalCollaborationPlugin";
+import LexicalErrorBoundary from "@lexical/react/LexicalErrorBoundary";
 
-import { getSharedDoc, getSharedProvider } from '../utils/collaboration';
+import { HeadingNode, QuoteNode } from "@lexical/rich-text";
+import { ListNode, ListItemNode } from "@lexical/list";
+import { CodeNode } from "@lexical/code";
+import { LinkNode } from "@lexical/link";
 
-export default function Editor({ uniqueId }) {
-  const initialConfig = useMemo(() => ({
-    namespace: 'Crousia',
+import { ParagraphNode, TextNode } from "lexical";
+
+import { getSharedDoc, getSharedProvider, isAdmin } from "../utils/collaboration";
+
+const USERNAME = "user_" + Math.floor(Math.random() * 1000);
+
+export default function Editor() {
+  const readonly = !isAdmin();
+
+  const doc = useMemo(() => getSharedDoc(), []);
+  const provider = useMemo(() => getSharedProvider({ readonly, username: USERNAME }), [readonly]);
+
+  const providerFactory = (id, yjsDocMap) => {
+    yjsDocMap.set(id, doc);
+    return provider;
+  };
+
+  const initialConfig = {
+    namespace: "CrousiaEditor",
+    editable: !readonly,
     nodes: [
+      ParagraphNode,
+      TextNode,
       HeadingNode,
       QuoteNode,
       ListNode,
       ListItemNode,
       CodeNode,
-      ParagraphNode,
-      TextNode,
       LinkNode
     ],
-    onError: (e) => console.error('Lexical Error:', e),
-  }), []);
-
-  const providerFactory = useMemo(() => {
-    return (id, yjsDocMap) => {
-      const doc = getSharedDoc();
-      const provider = getSharedProvider();
-      yjsDocMap.set(id, doc);
-      return provider;
-    };
-  }, []);
+    theme: {
+      paragraph: "editor-paragraph",
+    },
+    onError(error) {
+      console.error("Lexical error:", error);
+    },
+  };
 
   return (
-    <LexicalComposer key={uniqueId} initialConfig={initialConfig}>
-      <div className="editor-container border p-4 rounded shadow-sm">
+    <LexicalComposer initialConfig={initialConfig}>
+      <div className="editor-container">
         <CollaborationPlugin
-          id="crousia-shared-room"
+          id="crousia-editor"
           providerFactory={providerFactory}
-          shouldBootstrap={true}
+          username={USERNAME}
         />
         <RichTextPlugin
-          contentEditable={<ContentEditable className="editor-input min-h-[200px] outline-none" />}
-          placeholder={<div className="absolute top-4 left-4 text-gray-400 pointer-events-none">Start collaborating...</div>}
+          contentEditable={<ContentEditable className="editor-input" />}
+          placeholder={<div>Start writing...</div>}
           ErrorBoundary={LexicalErrorBoundary}
         />
+        <HistoryPlugin />
       </div>
     </LexicalComposer>
   );
