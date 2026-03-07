@@ -33,6 +33,8 @@ class ErrorBoundary extends React.Component {
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <ErrorBoundary>
-    <App />
+    <GateKeeper>
+      <App />
+    </GateKeeper>
   </ErrorBoundary>
 );
