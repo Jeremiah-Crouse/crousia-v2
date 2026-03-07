@@ -1,3 +1,7 @@
+.editor-input span[style*="color"] {
+  color: inherit !important;
+}
+
 .editor-container {
   position: relative;
   line-height: 1.6;
@@ -32,4 +36,30 @@
 .editor-italic { font-style: italic; }
 .editor-h1 { font-size: 24px; font-weight: 700; margin: 10px 0; }
 .editor-ul { padding-left: 20px; list-style-type: disc; }
+
+/* Remote User Cursors */
+.collaboration-cursor__caret {
+  position: relative;
+  margin-left: -1px;
+  margin-right: -1px;
+  border-left: 1px solid #0d0d0d;
+  border-right: 1px solid #0d0d0d;
+  word-break: normal;
+  pointer-events: none;
+}
+
+.collaboration-cursor__label {
+  position: absolute;
+  top: -1.4em;
+  left: -1px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  user-select: none;
+  color: #fff;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px 3px 3px 0;
+  white-space: nowrap;
+}
 

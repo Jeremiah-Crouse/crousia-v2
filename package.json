@@ -19,12 +19,14 @@
     "@lexical/table": "^0.14.5",
     "@lexical/utils": "^0.14.5",
     "@lexical/yjs": "^0.14.5",
+    "express": "^5.2.1",
     "lexical": "^0.14.5",
     "marked": "^17.0.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "ws": "^8.19.0",
     "y-indexeddb": "^9.0.12",
+    "y-leveldb": "^0.2.0",
     "y-websocket": "^1.5.4",
     "yjs": "^13.6.29"
   },
@@ -41,5 +43,18 @@
   },
   "overrides": {
     "vite": "^8.0.0-beta.13"
-  }
+  },
+  "description": "This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.",
+  "main": "eslint.config.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jeremiah-Crouse/crousia-v2.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Jeremiah-Crouse/crousia-v2/issues"
+  },
+  "homepage": "https://github.com/Jeremiah-Crouse/crousia-v2#readme"
 }

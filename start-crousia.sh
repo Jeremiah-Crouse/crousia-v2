@@ -1,7 +1,12 @@
 #!/bin/bash
 # crousia-keepalive.sh
-# Keep server-sync.js, serve.js, and Cloudflare Tunnel alive
-# Must be run in Ubuntu root shell (manually)
+# Keep serve.js, Yjs WebSocket, and Cloudflare Tunnel alive
+# Works inside proot-distro Ubuntu
+
+# Detect if running inside proot and source the proot entry if needed
+if [ -f ~/bash ] && [ -z "$PROOT_LOADED" ]; then
+    source ~/bash
+fi
 
 LOGS="/root/crousia-v2/logs"
 mkdir -p "$LOGS"
@@ -25,13 +30,13 @@ while true; do
     # fi
 
     # 1️⃣ Yjs WebSocket server (using built-in y-websocket with working persistence)
-    if ! pgrep -f "y-websocket" > /dev/null; then
+    if ! pgrep -f "y-websocket/bin/server.js" > /dev/null; then
         echo "$TIMESTAMP Starting y-websocket server..." | tee -a "$LOGS/keepalive.log"
         nohup bash -c 'HOST=0.0.0.0 PORT=1234 YPERSISTENCE=./crousia-db node /root/crousia-v2/node_modules/y-websocket/bin/server.js' >> "$LOGS/sync.log" 2>&1 &
         sleep 2
     fi
 
-    # 2️⃣ serve.js (your Node static site server)
+    # 2️⃣ serve.js (Node static site server)
     if ! pgrep -f "$WEB_SERVER" > /dev/null; then
         echo "$TIMESTAMP Starting serve.js..." | tee -a "$LOGS/keepalive.log"
         nohup node "$WEB_SERVER" >> "$LOGS/serve.log" 2>&1 &

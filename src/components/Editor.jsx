@@ -1,11 +1,13 @@
 // src/components/Editor.jsx
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect } from "react";
 
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
 import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
 import { CollaborationPlugin } from "@lexical/react/LexicalCollaborationPlugin";
+import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPlugin";
+import { TRANSFORMERS } from "@lexical/markdown";
 import LexicalErrorBoundary from "@lexical/react/LexicalErrorBoundary";
 
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
@@ -15,12 +17,17 @@ import { LinkNode } from "@lexical/link";
 
 import { ParagraphNode, TextNode } from "lexical";
 
-import { getSharedDoc, getSharedProvider, isAdmin } from "../utils/collaboration";
+import { getSharedDoc, getSharedProvider, checkAndSync, isAdmin } from "../utils/collaboration";
 
-const USERNAME = "user_" + Math.floor(Math.random() * 1000);
+const USERNAMES = ['hedgehog', 'shark', 'otter', 'eagle', 'wolf', 'fox', 'bear', 'owl'];
+const USERNAME = USERNAMES[Math.floor(Math.random() * USERNAMES.length)];
 
 export default function Editor() {
   const readonly = !isAdmin();
+
+  useEffect(() => {
+    checkAndSync();
+  }, []);
 
   const doc = useMemo(() => getSharedDoc(), []);
   const provider = useMemo(() => getSharedProvider({ readonly, username: USERNAME }), [readonly]);
@@ -65,6 +72,7 @@ export default function Editor() {
           ErrorBoundary={LexicalErrorBoundary}
         />
         <HistoryPlugin />
+        <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
       </div>
     </LexicalComposer>
   );
