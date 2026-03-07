@@ -49,6 +49,27 @@ app.post('/api/archive-today', async (req, res) => {
       return '';
     };
 
+    app.get('/api/debug-everything', (req, res) => {
+  // 1. Check all keys in the document
+  const keys = Array.from(sharedDoc.share.keys());
+  
+  // 2. Dump the content of every key
+  const debugData = {};
+  keys.forEach(key => {
+    const type = sharedDoc.get(key);
+    // Attempt to get the content via different methods
+    debugData[key] = {
+      type: type.constructor.name,
+      toString: typeof type.toString === 'function' ? type.toString() : 'N/A',
+      toJSON: typeof type.toJSON === 'function' ? type.toJSON() : 'N/A',
+      length: typeof type.length !== 'undefined' ? type.length : 'N/A'
+    };
+  });
+
+  console.log('DEBUG: Full Document State:', JSON.stringify(debugData, null, 2));
+  res.json({ keys, debugData });
+});
+
     const rootType = sharedDoc.get('root');
     const markdown = extractText(rootType);
 
