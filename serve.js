@@ -11,7 +11,7 @@ import WebSocket from "ws";
 const app = express();
 const PORT = 5000;
 const HOST = "0.0.0.0";
-const ARCHIVES_DIR = '/root/crousia-v2/archives';
+const ARCHIVES_DIR = 'archives';
 
 if (!fs.existsSync(ARCHIVES_DIR)) fs.mkdirSync(ARCHIVES_DIR, { recursive: true });
 
