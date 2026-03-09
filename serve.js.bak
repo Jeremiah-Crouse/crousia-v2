@@ -19,33 +19,19 @@ if (!fs.existsSync(ARCHIVES_DIR)) fs.mkdirSync(ARCHIVES_DIR, { recursive: true }
 const sharedDoc = new Y.Doc();
 
 // 2. Connect as a client to the binary sync server (port 1234)
-// Use localhost to avoid cloudflare tunnel overhead
+// This keeps the sync binary as the "Owner" of the LevelDB lock
 const provider = new WebsocketProvider(
-  'ws://localhost:1234',  // Local connection instead of going through tunnel
-  'crousia-shared-room',
+  'wss://admin.crousia.com/ysl', // Match the client's URL
+  'crousia-shared-room',         // Ensure this room name matches perfectly
   sharedDoc,
   { WebSocketPolyfill: WebSocket }
 );
 
-// Log sync status
-provider.on('status', (event) => {
-  console.log('📡 Provider status:', event.status);
-});
-
-provider.on('sync', (isSynced) => {
-  console.log('🔄 Sync status:', isSynced ? 'synced' : 'not synced');
-  if (isSynced) {
-    console.log('📝 Doc content sample:', sharedDoc.getXmlFragment('content').toString().substring(0, 100));
-  }
-});
-
-app.use(express.json());
-
 app.use(express.json());
 
 // 3. API Routes
-app.post('/api/archive-today', (req, res) => {
-  const content = req.body?.content || '';
+app.post('/api/archive-today', express.json(), (req, res) => {
+  const { content } = req.body;
   const today = new Date().toISOString().split('T')[0];
   const archivePath = path.join(ARCHIVES_DIR, `${today}.json`);
   
@@ -82,11 +68,9 @@ app.get('/api/archive/:date', (req, res) => {
 
 // Add this check to your API routes
 app.get('/api/status', (req, res) => {
-  const content = sharedDoc.getXmlFragment('content').toString();
   res.json({
     synced: provider.synced,
-    hasContent: content.length > 0,
-    contentPreview: content.substring(0, 100)
+    isLocalEmpty: sharedDoc.isEmpty // True if it hasn't received data yet
   });
 });
 

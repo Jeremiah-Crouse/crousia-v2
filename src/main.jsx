@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import GateKeeper from "./components/GateKeeper";
 
 // Simple error boundary so React crashes show on screen
 class ErrorBoundary extends React.Component {
@@ -33,6 +34,8 @@ class ErrorBoundary extends React.Component {
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <ErrorBoundary>
-    <App />
+    <GateKeeper>
+      <App />
+    </GateKeeper>
   </ErrorBoundary>
 );

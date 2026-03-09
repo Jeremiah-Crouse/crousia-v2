@@ -98,6 +98,30 @@ h1 { color: var(--gold); margin-bottom: 0.5rem; }
     margin: 2rem auto;
 }
 
+/* The !important is key here to beat Lexical's default black text */
+.editor-input span {
+  transition: color 0.2s ease;
+}
+
+/* Update this in your index.css */
+.text-purple {
+  /* A more vibrant, high-contrast purple */
+  color: #c48eff !important; 
+  
+  /* Adds a subtle 'neon' glow that helps it stand out on black */
+  text-shadow: 0 0 8px rgba(196, 142, 255, 0.4);
+}
+
+.text-gold {
+  color: #FFD700 !important;
+  text-shadow: 0 0 8px rgba(255, 215, 0, 0.3);
+}
+
+::selection {
+  background: rgba(196, 142, 255, 0.3); /* Subtle purple selection */
+  color: white;
+}
+
 .links-container {
   display: flex;
   flex-direction: column;

@@ -1,20 +1,17 @@
 // server-sync.js
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-
-// Force the use of the root-level Yjs
-const Y = require('/root/crousia-v2/node_modules/yjs');
-const { setupWSConnection } = require('y-websocket/bin/utils');
-const { LeveldbPersistence } = require('y-leveldb');
-const { setPersistence } = require('y-websocket/bin/utils');
-
+import express from 'express';
 import http from 'http';
 import { WebSocketServer } from 'ws';
+import * as Y from 'yjs';
+import { setupWSConnection } from 'y-websocket/bin/utils';
+import { LeveldbPersistence } from 'y-leveldb';
 
 const port = 1234;
+const internalPort = 5001; // Internal port for API requests
 const ldb = new LeveldbPersistence('./crousia-db');
 
-setPersistence({
+// Setup persistence
+const persistence = {
   bindState: async (docName, ydoc) => {
     const persistedState = await ldb.getYDoc(docName);
     const stateVector = Y.encodeStateVector(persistedState);
@@ -23,7 +20,15 @@ setPersistence({
     ydoc.on('update', update => ldb.storeUpdate(docName, update));
   },
   writeState: async (docName, ydoc) => {}
+};
+
+// Internal API for archive-server to fetch state
+const syncApi = express();
+syncApi.get('/internal-state', async (req, res) => {
+  const ydoc = await ldb.getYDoc('crousia-shared-room');
+  res.send(Buffer.from(Y.encodeStateAsUpdate(ydoc)));
 });
+syncApi.listen(internalPort, '127.0.0.1');
 
 const server = http.createServer();
 const wss = new WebSocketServer({ noServer: true });
@@ -35,11 +40,72 @@ server.on('upgrade', (request, socket, head) => {
 });
 
 wss.on('connection', (conn, req) => {
-  console.log('🔗 Client connected');
-  setupWSConnection(conn, req, { docName: 'crousia-shared-room' });
+  setupWSConnection(conn, req, { docName: 'crousia-shared-room', persistence });
 });
 
-server.listen(port, '0.0.0.0', () => {
-  console.log(`🚀 Yjs Sync Server live on port ${port}`);
+/// CRAZY
+
+import { $getRoot } from 'lexical'; // not needed — pure JSON manipulation
+
+function sanitizeLexicalNodes(node) {
+  if (!node) return node;
+  if (node.type === 'authored-text') {
+    node.type = 'text';
+    delete node.author;
+  }
+  if (Array.isArray(node.children)) {
+    node.children = node.children.map(sanitizeLexicalNodes);
+  }
+  return node;
+}
+
+syncApi.post('/admin/sanitize-doc', async (req, res) => {
+  try {
+    const ydoc = await ldb.getYDoc('crousia-shared-room');
+    const xmlFragment = ydoc.getXmlFragment('root'); // Lexical's default Yjs binding key
+
+    // Lexical stores its state as a serialized JSON string inside a Yjs Text node
+    const lexicalText = ydoc.getText('lexical');
+    const raw = lexicalText.toString();
+
+    if (!raw) {
+      return res.json({ ok: true, message: 'No lexical text found, nothing to sanitize' });
+    }
+
+    const parsed = JSON.parse(raw);
+    const sanitized = sanitizeLexicalNodes(parsed);
+    
+    // Replace the content in a single Yjs transaction
+    ydoc.transact(() => {
+      lexicalText.delete(0, lexicalText.length);
+      lexicalText.insert(0, JSON.stringify(sanitized));
+    });
+
+    await ldb.storeUpdate('crousia-shared-room', Y.encodeStateAsUpdate(ydoc));
+    res.json({ ok: true, message: 'Sanitized successfully' });
+  } catch (err) {
+    console.error('Sanitize failed:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
+syncApi.get('/admin/inspect-doc', async (req, res) => {
+  const ydoc = await ldb.getYDoc('crousia-shared-room');
+  const keys = {
+    texts: [...ydoc.share.entries()]
+      .filter(([, v]) => v.constructor.name === 'Text')
+      .map(([k]) => k),
+    xmlFragments: [...ydoc.share.entries()]
+      .filter(([, v]) => v.constructor.name === 'XmlFragment')
+      .map(([k]) => k),
+    maps: [...ydoc.share.entries()]
+      .filter(([, v]) => v.constructor.name === 'Map')
+      .map(([k]) => k),
+  };
+  res.json(keys);
+});
+
+/// CRAZY
+
+
+server.listen(port, '0.0.0.0', () => console.log(`🚀 Sync Server on ${port}, Internal API on ${internalPort}`));

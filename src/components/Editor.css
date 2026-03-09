@@ -32,10 +32,47 @@
 }
 
 /* Markdown Rendering Styles */
-.editor-bold { font-weight: bold; }
-.editor-italic { font-style: italic; }
+.editor-bold, .text-gold.editor-bold, .text-purple.editor-bold { font-weight: bold !important; }
+.editor-italic, .text-gold.editor-italic, .text-purple.editor-italic { font-style: italic !important; }
+.editor-strikethrough, .text-gold.editor-strikethrough, .text-purple.editor-strikethrough { text-decoration: line-through; }
+.editor-code, .text-gold.editor-code, .text-purple.editor-code { font-family: monospace; background: #f0f0f0; padding: 2px 4px; border-radius: 3px; }
 .editor-h1 { font-size: 24px; font-weight: 700; margin: 10px 0; }
 .editor-ul { padding-left: 20px; list-style-type: disc; }
+
+/* Fix for bold+italic */
+.editor-bold.editor-italic {
+  font-weight: bold !important;
+  font-style: italic !important;
+}
+
+/* Horizontal rule */
+editor-hr {
+  border: none;
+  border-top: 2px solid #ccc;
+  margin: 20px 0;
+}
+
+/* Force italic to work regardless of other styles */
+.editor-input span[style*="font-style"] {
+  font-style: inherit !important;
+}
+
+.text-gold, .text-purple {
+  font-weight: normal !important;
+}
+
+/* Color text based on inline style from AuthorshipColorPlugin */
+.editor-input span[style*="color: #FFD700"] {
+  color: #FFD700 !important;
+}
+
+.editor-input span[style*="color: #A020F0"] {
+  color: #A020F0 !important;
+}
+
+.text-gold strong, .text-purple strong {
+  font-weight: bold !important;
+}
 
 /* Remote User Cursors */
 .collaboration-cursor__caret {
@@ -61,5 +98,13 @@
   padding: 0.1rem 0.3rem;
   border-radius: 3px 3px 3px 0;
   white-space: nowrap;
+}
+
+/* FINAL: Bold+italic must work - ultra specific */
+.editor-bold.editor-italic,
+strong[class="editor-bold editor-italic"],
+strong.editor-bold.editor-italic {
+  font-weight: bold !important;
+  font-style: italic !important;
 }
 

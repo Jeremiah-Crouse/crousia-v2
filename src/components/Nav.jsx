@@ -1,7 +1,17 @@
-import React from 'react';
+// src/components/Nav.jsx
+import React, { useContext } from 'react';
+import { UserContext } from '../context/UserContext';
 import { clearSharedData } from '../utils/collaboration';
 
 export default function Nav({ currentView, setView }) {
+  // We assume UserContext now provides { name, handleLogout }
+  const { name, handleLogout } = useContext(UserContext);
+
+  const performLogout = () => {
+    clearSharedData();
+    handleLogout();
+  };
+
   return (
     <nav className="nav">
       <div className="nav-brand">
@@ -11,8 +21,12 @@ export default function Nav({ currentView, setView }) {
         <a className={currentView === 'home' ? 'active' : ''} onClick={() => setView('home')}>HOME</a>
         <a className={currentView === 'log' ? 'active' : ''} onClick={() => setView('log')}>LOG</a>
         <a className={currentView === 'links' ? 'active' : ''} onClick={() => setView('links')}>LINKS</a>
+        
+        {/* The simple Logout link */}
+        {name && name !== "guest" && (
+          <a onClick={performLogout} style={{ cursor: 'pointer' }}>LOGOUT</a>
+        )}
       </div>
     </nav>
   );
 }
-
