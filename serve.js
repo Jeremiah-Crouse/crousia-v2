@@ -892,6 +892,51 @@ app.post('/api/comments/:date', (req, res) => {
   }
 });
 
+// ─── SMS inbox — Lauren's messages via Termux bridge ─────────────────
+app.post('/api/sms/inbox', express.json(), async (req, res) => {
+  const { from, text } = req.body || {};
+  if (!from || !text) return res.status(400).json({ error: 'from and text required' });
+  const cleanFrom = from.replace(/^\+/, '');
+  if (cleanFrom !== '19363306561') return res.status(403).json({ error: 'unauthorized sender' });
+
+  const prompt = `[SMS from Lauren: ${text}]`;
+  const data = JSON.stringify({
+    parts: [{ type: 'text', text: prompt }],
+    model: { providerID: 'opencode-go', modelID: 'deepseek-v4-flash' }
+  });
+
+  try {
+    const reply = await new Promise((resolve, reject) => {
+      const req = http.request({
+        hostname: '127.0.0.1', port: 1111,
+        path: '/session/ses_1befb4677ffeSgQHiz4NWAbDBp/message',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
+      }, (res) => {
+        let buf = '';
+        res.on('data', d => buf += d);
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(buf);
+            const parts = parsed.parts || [];
+            const reasoning = parts.filter(p => p.type === 'reasoning').map(p => p.text).join('').trim();
+            const response = parts.filter(p => p.type === 'text').map(p => p.text).join('').trim();
+            resolve({ reply: response || '[no response]', reasoning });
+          } catch (e) { reject(new Error('parse failed')); }
+        });
+      });
+      req.setTimeout(120000, () => { req.destroy(); reject(new Error('timeout')); });
+      req.on('error', reject);
+      req.write(data);
+      req.end();
+    });
+
+    res.json(reply);
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
 app.use('/api', archivesRouter);
 
 // Static Hosting

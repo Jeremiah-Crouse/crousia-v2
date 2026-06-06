@@ -10,6 +10,7 @@ const Log = lazy(() => import('./pages/Log'));
 const Links = lazy(() => import('./pages/Links'));
 const About = lazy(() => import('./pages/About'));
 const Signup = lazy(() => import('./pages/Signup'));
+const Numberology = lazy(() => import('./pages/Numberology'));
 
 const pathToView = {
   '/': 'da-she',
@@ -18,6 +19,7 @@ const pathToView = {
   '/links': 'links',
   '/about': 'about',
   '/signup': 'signup',
+  '/numberology': 'numberology',
 };
 
 const viewToPath = {};
@@ -79,6 +81,7 @@ export default function App() {
             {view === 'links' && <Links />}
             {view === 'about' && <About />}
             {view === 'signup' && <Signup />}
+            {view === 'numberology' && <Numberology />}
           </Suspense>
         </main>
       </div>

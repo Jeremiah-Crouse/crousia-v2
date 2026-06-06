@@ -61,6 +61,7 @@ export default function Nav({ currentView, setView }) {
   const navItems = [
     { label: 'Home', view: 'da-she' },
     { label: 'YJS', view: 'home' },
+    { label: 'Numberology', view: 'numberology' },
     { label: 'Archive', view: 'log' },
     { label: 'Links', view: 'links' },
     { label: 'About', view: 'about' },
